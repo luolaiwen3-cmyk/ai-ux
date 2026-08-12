@@ -113,3 +113,21 @@ ai-ux/
 ​    └── shared/
 
 ​      └── AnalystLayout.jsx  ← 分析端共享布局
+
+
+
+master（生产环境，稳定版本）
+  │
+  └── develop（开发集成分支）
+        │
+        ├── feature/测试人员
+        │     ├── feat/P1-入口页 git分支 feat/P1-pageOfindex
+        │     ├── feat/P2-校准页
+        │     └── feat/P3-测试任务页
+        │
+        └── feature/UX分析人员
+              ├── feat/A1-任务管理
+              ├── feat/A2-会话列表
+              ├── feat/A3-单会话深度分析
+              ├── feat/A4-报告导出
+              └── feat/A5-仪表盘
