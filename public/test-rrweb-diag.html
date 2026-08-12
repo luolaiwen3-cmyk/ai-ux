@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>rrweb 事件频率诊断</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, monospace; background: #0a0e17; color: #e6edf6; padding: 20px; }
+    .container { max-width: 1000px; margin: 0 auto; }
+    h1 { font-size: 18px; margin-bottom: 16px; color: #22e6c8; }
+    .controls { display: flex; gap: 8px; margin-bottom: 20px; }
+    .btn { padding: 8px 16px; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
+    .btn-start { background: #059669; color: #fff; }
+    .btn-stop { background: #dc2626; color: #fff; }
+    .btn-clear { background: #334155; color: #e2e8f0; }
+    .status { padding: 12px; border-radius: 8px; background: #111827; margin-bottom: 16px; font-size: 12px; }
+    .status.recording { border: 1px solid #dc2626; }
+    .status.stopped { border: 1px solid #059669; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .panel { background: #111827; border-radius: 8px; padding: 16px; border: 1px solid #1f2937; }
+    .panel h2 { font-size: 13px; color: #22e6c8; margin-bottom: 12px; }
+    .event-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 11px; border-bottom: 1px solid #1e293b; }
+    .event-row .name { color: #94a3b8; }
+    .event-row .count { font-weight: 600; }
+    .count.high { color: #ef4444; }
+    .count.medium { color: #f59e0b; }
+    .count.low { color: #22e6c8; }
+    .log { background: #0f172a; border-radius: 6px; padding: 10px; font-size: 10px; max-height: 150px; overflow-y: auto; font-family: monospace; }
+    .log .t { color: #64748b; }
+    .test-area { background: #f5f5f7; border-radius: 8px; padding: 20px; color: #1e293b; min-height: 120px; margin-bottom: 16px; }
+    .test-area h3 { font-size: 14px; margin-bottom: 10px; }
+    .test-item { padding: 8px; background: #fff; border-radius: 4px; margin-bottom: 6px; cursor: pointer; border: 1px solid #e2e8f0; font-size: 12px; }
+    .test-item:hover { border-color: #f97316; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔬 rrweb 事件频率诊断</h1>
+
+    <div class="controls">
+      <button class="btn btn-start" onclick="startRec()">▶ 开始录制</button>
+      <button class="btn btn-stop" onclick="stopRec()">⏹ 停止</button>
+      <button class="btn btn-clear" onclick="clearRec()">🗑 清除</button>
+    </div>
+
+    <div class="status stopped" id="status">
+      状态：未开始 | 事件总数：0 | 录制时长：0ms
+    </div>
+
+    <!-- 测试操作区 -->
+    <div class="test-area" id="testArea">
+      <h3>📦 测试操作区（录制时操作这里）</h3>
+      <div class="test-item" onclick="toggleItem(this)">🎧 Sony WH-1000XM5 — ¥2,499</div>
+      <div class="test-item" onclick="toggleItem(this)">⌨️ Keychron Q1 Pro — ¥1,198</div>
+      <div class="test-item" onclick="toggleItem(this)">🪑 Herman Miller Aeron — ¥8,800</div>
+    </div>
+
+    <div class="grid">
+      <!-- 事件类型统计 -->
+      <div class="panel">
+        <h2>📊 事件类型统计</h2>
+        <div id="eventStats"></div>
+      </div>
+
+      <!-- Mutation 来源统计 -->
+      <div class="panel">
+        <h2>🔍 Mutation 来源分析</h2>
+        <div id="mutationStats"></div>
+      </div>
+
+      <!-- 时间分布 -->
+      <div class="panel">
+        <h2>⏱ 事件时间分布（每 1s）</h2>
+        <div id="timeStats"></div>
+      </div>
+
+      <!-- 实时日志 -->
+      <div class="panel">
+        <h2>📋 实时日志</h2>
+        <div class="log" id="log"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { record } from 'https://cdn.jsdelivr.net/npm/rrweb@2.0.0-alpha.4/+esm'
+
+    let stopFn = null
+    let events = []
+    let startTime = 0
+    let eventStats = {}
+    let mutationStats = {}
+    let timeStats = {}
+
+    const $ = id => document.getElementById(id)
+    const log = (msg) => {
+      const el = $('log')
+      const t = new Date().toLocaleTimeString('zh-CN', { hour12: false })
+      el.innerHTML += `<div><span class="t">[${t}]</span> ${msg}</div>`
+      el.scrollTop = el.scrollHeight
+    }
+
+    const typeNames = {
+      0: 'FullSnapshot',
+      1: 'IncrementalSnapshot',
+      2: 'Mutation',
+      3: 'Mouse',
+      4: 'Scroll',
+      5: 'Input',
+      6: 'ViewportResize'
+    }
+
+    window.startRec = () => {
+      events = []
+      eventStats = {}
+      mutationStats = {}
+      timeStats = {}
+      startTime = Date.now()
+
+      stopFn = record({
+        emit(event) {
+          events.push(event)
+
+          // 统计事件类型
+          const typeName = typeNames[event.type] || `Type${event.type}`
+          eventStats[typeName] = (eventStats[typeName] || 0) + 1
+
+          // 统计 Mutation 来源
+          if (event.type === 2 && event.data) {
+            const source = event.data.source || 'unknown'
+            mutationStats[source] = (mutationStats[source] || 0) + 1
+          }
+
+          // 时间分布（每秒）
+          const elapsed = Math.floor((Date.now() - startTime) / 1000)
+          timeStats[elapsed] = (timeStats[elapsed] || 0) + 1
+
+          updateDisplay()
+        },
+        maskAllInputs: true,
+        sampling: {
+          mousemove: 200,
+          mouseInteraction: true,
+          scroll: 150,
+          input: 'last'
+        },
+        checkoutEveryNms: 10000
+      })
+
+      $('status').className = 'status recording'
+      $('status').textContent = '状态：录制中... | 事件总数：0 | 录制时长：0ms'
+      log('✅ 录制开始')
+    }
+
+    window.stopRec = () => {
+      if (stopFn) { stopFn(); stopFn = null }
+      $('status').className = 'status stopped'
+      log(`⏹ 录制停止: ${events.length} 个事件`)
+      printReport()
+    }
+
+    window.clearRec = () => {
+      events = []
+      eventStats = {}
+      mutationStats = {}
+      timeStats = {}
+      $('status').className = 'status stopped'
+      $('status').textContent = '状态：未开始 | 事件总数：0 | 录制时长：0ms'
+      updateDisplay()
+      $('log').innerHTML = ''
+    }
+
+    window.toggleItem = (el) => {
+      el.style.background = el.style.background === '#fef3c7' ? '#fff' : '#fef3c7'
+    }
+
+    const updateDisplay = () => {
+      const elapsed = Date.now() - startTime
+      $('status').textContent = `状态：录制中... | 事件总数：${events.length} | 录制时长：${elapsed}ms`
+
+      // 事件类型统计
+      let html = ''
+      Object.entries(eventStats)
+        .sort((a, b) => b[1] - a[1])
+        .forEach(([name, count]) => {
+          const cls = count > 100 ? 'high' : count > 20 ? 'medium' : 'low'
+          html += `<div class="event-row"><span class="name">${name}</span><span class="count ${cls}">${count}</span></div>`
+        })
+      $('eventStats').innerHTML = html || '<div class="event-row">暂无数据</div>'
+
+      // Mutation 来源
+      html = ''
+      Object.entries(mutationStats)
+        .sort((a, b) => b[1] - a[1])
+        .forEach(([name, count]) => {
+          html += `<div class="event-row"><span class="name">${name}</span><span class="count medium">${count}</span></div>`
+        })
+      $('mutationStats').innerHTML = html || '<div class="event-row">暂无数据</div>'
+
+      // 时间分布
+      html = ''
+      Object.entries(timeStats)
+        .sort((a, b) => a[0] - b[0])
+        .forEach(([sec, count]) => {
+          const cls = count > 50 ? 'high' : count > 10 ? 'medium' : 'low'
+          const bar = '█'.repeat(Math.min(20, Math.floor(count / 5)))
+          html += `<div class="event-row"><span class="name">${sec}s</span><span class="count ${cls}">${count} ${bar}</span></div>`
+        })
+      $('timeStats').innerHTML = html || '<div class="event-row">暂无数据</div>'
+    }
+
+    const printReport = () => {
+      console.log('========== rrweb 事件诊断报告 ==========')
+      console.log(`总事件数: ${events.length}`)
+      console.log(`录制时长: ${Date.now() - startTime}ms`)
+      console.log('\n事件类型分布:')
+      Object.entries(eventStats).sort((a, b) => b[1] - a[1]).forEach(([k, v]) => {
+        console.log(`  ${k}: ${v} (${(v/events.length*100).toFixed(1)}%)`)
+      })
+      console.log('\nMutation 来源:')
+      Object.entries(mutationStats).sort((a, b) => b[1] - a[1]).forEach(([k, v]) => {
+        console.log(`  ${k}: ${v}`)
+      })
+      console.log('\n时间分布:')
+      Object.entries(timeStats).sort((a, b) => a[0] - b[0]).forEach(([k, v]) => {
+        console.log(`  ${k}s: ${v} events`)
+      })
+      console.log('=======================================')
+    }
+
+    log('📋 页面已加载，点击「开始录制」后观察事件频率')
+  </script>
+</body>
+</html>
