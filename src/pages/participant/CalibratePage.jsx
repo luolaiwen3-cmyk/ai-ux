@@ -1,43 +1,83 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { initMediaPipe, getCameraStream, startTracking, stopTracking } from '../../lib/mediaPipeTracker.js'
 
 /**
  * P2 校准页 —— MediaPipe 面部校准，确认面部可被捕捉
+ * 使用真实 MediaPipe FaceLandmarker 进行面部检测
  */
 export default function CalibratePage() {
   const navigate = useNavigate()
   const videoRef = useRef(null)
   const streamRef = useRef(null)
-  const [phase, setPhase] = useState('starting') // starting | calibrating | done
+  const [phase, setPhase] = useState('starting') // starting | calibrating | done | error
   const [progress, setProgress] = useState(0)
   const [faceDetected, setFaceDetected] = useState(false)
+  const [mediaPipeReady, setMediaPipeReady] = useState(false)
+  const [currentEmotion, setCurrentEmotion] = useState(null)
 
   useEffect(() => {
     let cancelled = false
-    const startCamera = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 640, height: 480 }
-        })
-        if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop())
-          return
-        }
-        streamRef.current = stream
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream
-        }
-        setPhase('calibrating')
-        runCalibration()
-      } catch {
-        // 无摄像头也能继续（Demo 容错）
-        setPhase('calibrating')
-        runCalibration()
+    let trackingActive = false
+
+    const startCalibration = async () => {
+      // 1. 初始化 MediaPipe
+      const mpReady = await initMediaPipe()
+      if (cancelled) return
+
+      if (!mpReady) {
+        console.warn('[Calibrate] MediaPipe 初始化失败，使用模拟模式')
       }
+      setMediaPipeReady(mpReady)
+
+      // 2. 获取摄像头
+      const stream = await getCameraStream()
+      if (cancelled) {
+        stream?.getTracks().forEach((t) => t.stop())
+        return
+      }
+
+      if (!stream) {
+        console.warn('[Calibrate] 摄像头不可用，使用模拟模式')
+        setPhase('calibrating')
+        runSimulatedCalibration()
+        return
+      }
+
+      streamRef.current = stream
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        await videoRef.current.play()
+      }
+
+      setPhase('calibrating')
+
+      // 3. 如果 MediaPipe 就绪，开始真实检测
+      if (mpReady && videoRef.current) {
+        trackingActive = true
+        await startTracking(videoRef.current, (result) => {
+          if (cancelled) return
+          setFaceDetected(result.faceDetected)
+          if (result.emotion) {
+            setCurrentEmotion(result.emotion)
+          }
+        })
+      }
+
+      // 4. 运行校准进度
+      await runCalibration()
     }
 
     const runCalibration = async () => {
-      // 模拟校准进度
+      for (let i = 0; i <= 100; i += 2) {
+        await new Promise((r) => setTimeout(r, 50))
+        if (cancelled) return
+        setProgress(i)
+      }
+      if (!cancelled) setPhase('done')
+    }
+
+    const runSimulatedCalibration = async () => {
       for (let i = 0; i <= 100; i += 2) {
         await new Promise((r) => setTimeout(r, 50))
         if (cancelled) return
@@ -47,10 +87,13 @@ export default function CalibratePage() {
       if (!cancelled) setPhase('done')
     }
 
-    startCamera()
+    startCalibration()
 
     return () => {
       cancelled = true
+      if (trackingActive) {
+        stopTracking()
+      }
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((t) => t.stop())
       }
@@ -58,6 +101,7 @@ export default function CalibratePage() {
   }, [])
 
   const handleContinue = () => {
+    stopTracking()
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop())
     }
@@ -129,11 +173,23 @@ export default function CalibratePage() {
               </div>
             </div>
 
+            {/* 实时情绪显示（MediaPipe 检测到时） */}
+            {currentEmotion && faceDetected && (
+              <div className="mb-4 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200">
+                <span className="text-[10px] text-slate-500">实时情绪：</span>
+                <span className="text-xs font-medium text-slate-700 ml-1">
+                  {currentEmotion.label} ({(currentEmotion.value * 100).toFixed(0)}%)
+                </span>
+              </div>
+            )}
+
             {/* 文案 */}
             {phase === 'starting' && (
               <>
                 <h1 className="text-lg font-semibold text-slate-900 mb-1">正在启动摄像头…</h1>
-                <p className="text-sm text-slate-500">请稍候</p>
+                <p className="text-sm text-slate-500">
+                  {mediaPipeReady ? 'MediaPipe 已就绪' : '正在加载 AI 模型...'}
+                </p>
               </>
             )}
 

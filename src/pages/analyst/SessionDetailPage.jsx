@@ -8,6 +8,7 @@ import BehaviorCards from '../../components/researcher/BehaviorCards.jsx'
 import DiagnosisPanel from '../../components/researcher/DiagnosisPanel.jsx'
 import { mouseTrail, clickEvents, timelineEvents, stressData, behaviorStats, sessionMeta } from '../../data/sessionData.js'
 import { loadFromStorage, hasStoredSession, getSessionIndex } from '../../lib/rrwebRecorder.js'
+import { loadFrames, hasFaceData } from '../../lib/mediaPipeTracker.js'
 
 /**
  * A3 单会话深度分析 —— 核心页面
@@ -20,6 +21,8 @@ export default function SessionDetailPage() {
   const [currentTime, setCurrentTime] = useState(0)
   const [playbackSpeed, setPlaybackSpeed] = useState(1)
   const [useRealData, setUseRealData] = useState(false)
+  const [faceFrames, setFaceFrames] = useState([])
+  const [hasFace, setHasFace] = useState(false)
   const duration = 20
   const rafRef = useRef(null)
   const lastTimeRef = useRef(null)
@@ -30,6 +33,14 @@ export default function SessionDetailPage() {
     const hasData = hasStoredSession(id) || hasStoredSession()
     setUseRealData(hasData)
     console.log('[SessionDetail] 会话ID:', id, '有数据:', hasData)
+
+    // 加载面部帧数据
+    const frames = loadFrames(id)
+    if (frames && frames.length > 0) {
+      setFaceFrames(frames)
+      setHasFace(true)
+      console.log('[SessionDetail] 面部帧数:', frames.length)
+    }
   }, [id])
 
   const animate = useCallback(
@@ -133,6 +144,7 @@ export default function SessionDetailPage() {
           {/* 右侧 40%：数据 + 报告 */}
           <div className="lg:col-span-5 flex flex-col gap-4 min-h-0 overflow-y-auto">
             <BehaviorCards stats={behaviorStats} meta={sessionMeta} />
+            {hasFace && <FaceDataCard frames={faceFrames} currentTime={currentTime} />}
             <StressChart data={stressData} currentTime={currentTime} duration={duration} />
             <DiagnosisPanel />
           </div>
@@ -140,4 +152,90 @@ export default function SessionDetailPage() {
       </div>
     </AnalystLayout>
   )
+}
+
+/**
+ * 面部数据卡片 —— 显示 MediaPipe 采集的面部帧和情绪
+ */
+function FaceDataCard({ frames, currentTime }) {
+  // 找到当前时间点最近的帧
+  const currentFrame = frames.find((f, i) => {
+    const nextFrame = frames[i + 1]
+    const timeSec = f.t - frames[0].t
+    const nextTimeSec = nextFrame ? nextFrame.t - frames[0].t : Infinity
+    return currentTime >= timeSec / 1000 && currentTime < nextTimeSec / 1000
+  }) || frames[frames.length - 1]
+
+  const emotion = currentFrame?.emotion || { label: 'Neutral', value: 0 }
+
+  // 情绪颜色
+  const emotionColors = {
+    Confusion: 'text-danger',
+    Surprise: 'text-warn',
+    Frustration: 'text-danger',
+    Focus: 'text-cyan-soft',
+    Neutral: 'text-slate-400'
+  }
+
+  return (
+    <div className="glass rounded-xl p-4 shrink-0">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[12px] font-mono text-slate-400 tracking-wide">
+          FACE_DATA · MediaPipe 面部数据
+        </span>
+        <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+          {frames.length} 帧
+        </span>
+      </div>
+
+      {/* 当前情绪 */}
+      <div className="flex items-center gap-3 mb-3">
+        <div className="w-12 h-12 rounded-lg bg-ink-800/60 border border-cyan-glow/10 flex items-center justify-center">
+          <span className="text-lg">{getEmoji(emotion.label)}</span>
+        </div>
+        <div className="flex-1">
+          <div className={`text-[14px] font-semibold ${emotionColors[emotion.label] || 'text-slate-200'}`}>
+            {emotion.label}
+          </div>
+          <div className="text-[10px] text-slate-500 font-mono">
+            置信度: {(emotion.value * 100).toFixed(0)}%
+          </div>
+        </div>
+        {/* 情绪强度条 */}
+        <div className="w-16 h-2 rounded-full bg-ink-700 overflow-hidden">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-cyan-glow to-cyan-soft transition-all"
+            style={{ width: `${emotion.value * 100}%` }}
+          />
+        </div>
+      </div>
+
+      {/* 情绪时间线（简化） */}
+      <div className="flex items-end gap-0.5 h-8">
+        {frames.slice(0, 40).map((f, i) => {
+          const val = f.emotion?.value || 0.1
+          return (
+            <div
+              key={i}
+              className="flex-1 rounded-t-sm bg-cyan-glow/40"
+              style={{ height: `${val * 100}%` }}
+              title={`${f.emotion?.label}: ${(val * 100).toFixed(0)}%`}
+            />
+          )
+        })}
+      </div>
+      <div className="text-[9px] text-slate-500 mt-1">情绪变化趋势</div>
+    </div>
+  )
+}
+
+function getEmoji(emotion) {
+  const map = {
+    Confusion: '😕',
+    Surprise: '😲',
+    Frustration: '😣',
+    Focus: '🧐',
+    Neutral: '😐'
+  }
+  return map[emotion] || '😐'
 }
