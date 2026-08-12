@@ -2,11 +2,13 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import CheckoutPage from '../../components/participant/CheckoutPage.jsx'
 import { startRecording, stopRecording, saveToStorage } from '../../lib/rrwebRecorder.js'
+import { initMediaPipe, getCameraStream, startTracking, stopTracking, saveFrame } from '../../lib/mediaPipeTracker.js'
 
 /**
  * P3 测试任务页 —— 被试实际操作的核心页面
  * 真实比例的电商结算页，可交互
  * + rrweb 行为录制（含安全截断机制）
+ * + MediaPipe 面部采集（后台静默运行）
  */
 export default function TaskPage() {
   const { sessionId } = useParams()
@@ -14,41 +16,97 @@ export default function TaskPage() {
   const [recordComplete, setRecordComplete] = useState(false)
   const [eventCount, setEventCount] = useState(0)
   const [stopReason, setStopReason] = useState(null)
+  const [faceEmotion, setFaceEmotion] = useState(null)
   const recordingRef = useRef(false)
   const eventCountRef = useRef(0)
+  const videoRef = useRef(null)
+  const streamRef = useRef(null)
+  const lastFaceCaptureRef = useRef(0)
 
-  // 页面加载时开始录制
+  // 页面加载时开始录制 + 面部采集
   useEffect(() => {
+    // 1. 开始 rrweb 录制
     const onEvent = (event) => {
-      // 检测停止信号
       if (event.type === '_stopped') {
         setStopReason(event.reason)
         return
       }
-      // 使用 ref 计数，避免 setState 触发 DOM 变化导致反馈循环
       eventCountRef.current += 1
     }
-
     startRecording(onEvent)
     setRecording(true)
     recordingRef.current = true
 
-    // 每 500ms 同步一次计数到 state（避免频繁渲染）
+    // 每 500ms 同步一次计数到 state
     const timer = setInterval(() => {
       if (eventCountRef.current > 0) {
         setEventCount(eventCountRef.current)
       }
     }, 500)
 
+    // 2. 开始 MediaPipe 面部采集（后台静默）
+    startFaceCapture()
+
     return () => {
       clearInterval(timer)
-      // 组件卸载时停止录制并保存
+      // 停止录制并保存
       if (recordingRef.current) {
         stopRecording()
         saveToStorage(sessionId)
       }
+      // 停止面部采集
+      stopTracking()
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop())
+      }
     }
   }, [sessionId])
+
+  // 启动面部采集
+  const startFaceCapture = async () => {
+    try {
+      // 初始化 MediaPipe
+      const mpReady = await initMediaPipe()
+      if (!mpReady) {
+        console.warn('[TaskPage] MediaPipe 不可用，跳过面部采集')
+        return
+      }
+
+      // 获取摄像头（后台静默，不显示视频）
+      const stream = await getCameraStream()
+      if (!stream) {
+        console.warn('[TaskPage] 摄像头不可用，跳过面部采集')
+        return
+      }
+      streamRef.current = stream
+
+      // 创建隐藏视频元素用于推理
+      if (!videoRef.current) {
+        const video = document.createElement('video')
+        video.srcObject = stream
+        video.play()
+        video.style.display = 'none'
+        document.body.appendChild(video)
+        videoRef.current = video
+      }
+
+      // 开始追踪
+      await startTracking(videoRef.current, (result) => {
+        if (result.emotion) {
+          setFaceEmotion(result.emotion)
+        }
+
+        // 降采样存储：每 200ms 存一帧
+        const now = Date.now()
+        if (now - lastFaceCaptureRef.current > 200) {
+          lastFaceCaptureRef.current = now
+          saveFrame(sessionId, result)
+        }
+      })
+    } catch (err) {
+      console.error('[TaskPage] 面部采集启动失败:', err)
+    }
+  }
 
   // 任务完成（优惠券决策后）
   const handleTaskComplete = useCallback(() => {
@@ -65,7 +123,6 @@ export default function TaskPage() {
 
   // 监听优惠券弹窗关闭 = 任务关键节点
   useEffect(() => {
-    // 15s 后自动判定任务完成（简化版）
     const timer = setTimeout(() => {
       if (recording) {
         handleTaskComplete()
@@ -102,7 +159,7 @@ export default function TaskPage() {
       {/* 真实的结算页 */}
       <CheckoutPage onDecision={handleTaskComplete} />
 
-      {/* 录制完成提示（data-no-record 防止被录制） */}
+      {/* 录制完成提示 */}
       {recordComplete && (
         <div className="fixed bottom-4 right-4 z-50 px-3 py-2 rounded-lg bg-emerald-500 text-white text-xs shadow-lg" data-no-record>
           ✓ 录制完成 · {eventCount} 个事件已保存

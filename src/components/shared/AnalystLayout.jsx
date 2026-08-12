@@ -1,5 +1,6 @@
 import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import ErrorBoundary from './ErrorBoundary.jsx'
 
 /**
  * 分析人员端共享布局 —— 左侧导航 + 右侧内容区
@@ -69,7 +70,7 @@ export default function AnalystLayout({ children }) {
 
       {/* 右侧内容 */}
       <div className="flex-1 min-w-0 overflow-y-auto">
-        {children}
+        <ErrorBoundary>{children}</ErrorBoundary>
       </div>
     </div>
   )

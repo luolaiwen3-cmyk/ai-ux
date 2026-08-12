@@ -2,16 +2,45 @@ import React, { useMemo, useRef, useEffect, useState } from 'react'
 import FaceMesh from './FaceMesh.jsx'
 import RrwebPlayer from './RrwebPlayer.jsx'
 import { loadFromStorage } from '../../lib/rrwebRecorder.js'
+import { loadFrames } from '../../lib/mediaPipeTracker.js'
 
 /**
  * 回放视口 —— 还原被试操作过程
  * 优先使用 rrweb 真实录制数据回放，降级到 mock 轨迹
+ * + MediaPipe 面部视频帧回放
  */
 export default function ReplayViewport({ currentTime, mouseTrail, clickEvents, duration, sessionId }) {
   const playerRef = useRef(null)
   const [hasRealData, setHasRealData] = useState(false)
   const [realEvents, setRealEvents] = useState([])
   const [playerDuration, setPlayerDuration] = useState(duration * 1000)
+  const [faceFrames, setFaceFrames] = useState([])
+
+  // 加载面部帧数据
+  useEffect(() => {
+    const frames = loadFrames(sessionId)
+    if (frames && frames.length > 0) {
+      setFaceFrames(frames)
+    }
+  }, [sessionId])
+
+  // 获取当前时间点的面部帧
+  const currentFaceFrame = useMemo(() => {
+    if (faceFrames.length === 0) return null
+    const baseTime = faceFrames[0].t
+    const targetTime = currentTime * 1000 + baseTime
+    // 找到最近的帧
+    let closest = faceFrames[0]
+    let minDiff = Math.abs(closest.t - targetTime)
+    for (const f of faceFrames) {
+      const diff = Math.abs(f.t - targetTime)
+      if (diff < minDiff) {
+        minDiff = diff
+        closest = f
+      }
+    }
+    return closest
+  }, [faceFrames, currentTime])
 
   // 检查是否有真实录制数据（从 localStorage 读取）
   useEffect(() => {
@@ -87,13 +116,17 @@ export default function ReplayViewport({ currentTime, mouseTrail, clickEvents, d
             <span className="text-[7px] font-mono text-slate-500">CAM-01</span>
           </div>
           <div className="relative aspect-[4/3] bg-gradient-to-br from-ink-700 to-ink-900">
-            <FaceMesh />
+            <FaceMesh
+              landmarks={currentFaceFrame?.keyPoints}
+              mode={currentFaceFrame?.snapshot ? 'snapshot' : 'simulated'}
+              snapshot={currentFaceFrame?.snapshot}
+            />
             <div className="absolute bottom-0.5 left-0.5 right-0.5 px-1 py-0.5 rounded bg-black/60">
               <div className="text-[7px] font-mono text-cyan-glow truncate">
                 面部特征提取中
               </div>
               <div className="text-[7px] font-mono text-danger truncate">
-                状态：{getEmotion(currentTime)}
+                状态：{currentFaceFrame?.emotion?.label || getEmotion(currentTime)} ({(currentFaceFrame?.emotion?.value * 100 || 0).toFixed(0)}%)
               </div>
             </div>
           </div>
@@ -114,13 +147,14 @@ export default function ReplayViewport({ currentTime, mouseTrail, clickEvents, d
     clickEvents={clickEvents}
     duration={duration}
     sessionId={sessionId}
+    currentFaceFrame={currentFaceFrame}
   />
 }
 
 /**
  * Mock 回放（降级方案，无真实数据时使用）
  */
-function MockReplayViewport({ currentTime, mouseTrail, clickEvents, duration, sessionId }) {
+function MockReplayViewport({ currentTime, mouseTrail, clickEvents, duration, sessionId, currentFaceFrame }) {
   const visibleTrail = useMemo(
     () => mouseTrail.filter((p) => p.t <= currentTime * 1000),
     [mouseTrail, currentTime]
@@ -272,10 +306,16 @@ function MockReplayViewport({ currentTime, mouseTrail, clickEvents, duration, se
             <span className="text-[7px] font-mono text-slate-500">CAM-01</span>
           </div>
           <div className="relative aspect-[4/3] bg-gradient-to-br from-ink-700 to-ink-900">
-            <FaceMesh />
+            <FaceMesh
+              landmarks={currentFaceFrame?.keyPoints}
+              mode={currentFaceFrame?.snapshot ? 'snapshot' : 'simulated'}
+              snapshot={currentFaceFrame?.snapshot}
+            />
             <div className="absolute bottom-0.5 left-0.5 right-0.5 px-1 py-0.5 rounded bg-black/60">
               <div className="text-[7px] font-mono text-cyan-glow truncate">面部特征提取中</div>
-              <div className="text-[7px] font-mono text-danger truncate">状态：{getEmotion(currentTime)}</div>
+              <div className="text-[7px] font-mono text-danger truncate">
+                状态：{currentFaceFrame?.emotion?.label || getEmotion(currentTime)} ({(currentFaceFrame?.emotion?.value * 100 || 0).toFixed(0)}%)
+              </div>
             </div>
           </div>
         </div>
