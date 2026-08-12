@@ -1,14 +1,38 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import AnalystLayout from '../../components/shared/AnalystLayout.jsx'
+import { getSessionIndex } from '../../lib/rrwebRecorder.js'
 
 /**
  * A2 会话列表 —— 所有被试会话总览，支持筛选/排序
+ * 优先从 localStorage 读取真实录制会话，降级到 mock 数据
  */
 export default function SessionListPage() {
   const [filter, setFilter] = useState('all') // all | p0 | p1 | completed | reviewing
+  const [realSessions, setRealSessions] = useState([])
 
-  const sessions = [
+  // 从 localStorage 读取真实录制会话
+  useEffect(() => {
+    const index = getSessionIndex()
+    if (index.length > 0) {
+      const sessions = index.map(s => ({
+        id: s.id,
+        task: '电商结算页优惠券弹窗测试',
+        participant: 'P-Real',
+        duration: `${(s.duration / 1000).toFixed(1)}s`,
+        status: 'completed',
+        severity: 'P0',
+        issue: '待分析（rrweb 真实录制）',
+        createdAt: new Date(s.savedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+        hasReport: false,
+        eventCount: s.eventCount,
+        isReal: true
+      }))
+      setRealSessions(sessions)
+    }
+  }, [])
+
+  const mockSessions = [
     {
       id: 'UX-0812-0037',
       task: '电商结算页优惠券弹窗测试',
@@ -77,7 +101,10 @@ export default function SessionListPage() {
     }
   ]
 
-  const filteredSessions = sessions.filter((s) => {
+  // 合并真实会话和 mock 会话，真实会话排在前面
+  const allSessions = [...realSessions, ...mockSessions]
+
+  const filteredSessions = allSessions.filter((s) => {
     if (filter === 'all') return true
     if (filter === 'p0') return s.severity === 'P0'
     if (filter === 'p1') return s.severity === 'P1'
@@ -104,7 +131,7 @@ export default function SessionListPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-lg font-semibold text-slate-100">会话列表</h1>
-            <p className="text-xs text-slate-500 mt-0.5">共 {sessions.length} 个会话 · {sessions.filter((s) => s.severity === 'P0').length} 个 P0 问题</p>
+            <p className="text-xs text-slate-500 mt-0.5">共 {allSessions.length} 个会话 · {allSessions.filter((s) => s.severity === 'P0').length} 个 P0 问题 · <span className="text-emerald-400">{realSessions.length} 个真实录制</span></p>
           </div>
         </div>
 

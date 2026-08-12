@@ -7,7 +7,7 @@ import OrderSummary from './OrderSummary.jsx'
  * 真实的电商结算页 —— 被试实际操作的主界面
  * 包含：顶部导航、商品列表、订单摘要、优惠券弹窗
  */
-export default function CheckoutPage() {
+export default function CheckoutPage({ onDecision }) {
   const [showPopup, setShowPopup] = useState(false)
   const [couponApplied, setCouponApplied] = useState(false)
   const [selectedItems, setSelectedItems] = useState([0, 1, 2])
@@ -21,6 +21,8 @@ export default function CheckoutPage() {
   const handleCouponDecision = (use) => {
     setShowPopup(false)
     if (use) setCouponApplied(true)
+    // 通知父组件用户已做出决策
+    if (onDecision) onDecision(use)
   }
 
   const toggleItem = (idx) => {

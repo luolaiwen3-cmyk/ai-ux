@@ -7,19 +7,30 @@ import Timeline from '../../components/researcher/Timeline.jsx'
 import BehaviorCards from '../../components/researcher/BehaviorCards.jsx'
 import DiagnosisPanel from '../../components/researcher/DiagnosisPanel.jsx'
 import { mouseTrail, clickEvents, timelineEvents, stressData, behaviorStats, sessionMeta } from '../../data/sessionData.js'
+import { loadFromStorage, hasStoredSession, getSessionIndex } from '../../lib/rrwebRecorder.js'
 
 /**
  * A3 单会话深度分析 —— 核心页面
  * 回放 + 多模态 + Agent 诊断
+ * + rrweb 真实录制数据回放
  */
 export default function SessionDetailPage() {
   const { id } = useParams()
   const [playing, setPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [playbackSpeed, setPlaybackSpeed] = useState(1)
+  const [useRealData, setUseRealData] = useState(false)
   const duration = 20
   const rafRef = useRef(null)
   const lastTimeRef = useRef(null)
+
+  // 检查是否有真实录制数据
+  useEffect(() => {
+    // 检查当前会话或任意会话
+    const hasData = hasStoredSession(id) || hasStoredSession()
+    setUseRealData(hasData)
+    console.log('[SessionDetail] 会话ID:', id, '有数据:', hasData)
+  }, [id])
 
   const animate = useCallback(
     (timestamp) => {
@@ -81,12 +92,19 @@ export default function SessionDetailPage() {
               </p>
             </div>
           </div>
-          <Link
-            to={`/report/${id || sessionMeta.id}`}
-            className="px-3 py-1.5 rounded-lg bg-cyan-glow/15 border border-cyan-glow/25 text-[11px] font-mono text-cyan-glow hover:bg-cyan-glow/25 transition-colors"
-          >
-            📄 查看报告
-          </Link>
+          <div className="flex items-center gap-2">
+            {useRealData && (
+              <span className="px-2 py-0.5 rounded text-[9px] font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                rrweb 真实录制
+              </span>
+            )}
+            <Link
+              to={`/report/${id || sessionMeta.id}`}
+              className="px-3 py-1.5 rounded-lg bg-cyan-glow/15 border border-cyan-glow/25 text-[11px] font-mono text-cyan-glow hover:bg-cyan-glow/25 transition-colors"
+            >
+              📄 查看报告
+            </Link>
+          </div>
         </div>
 
         {/* 主体：左右 6:4 */}
