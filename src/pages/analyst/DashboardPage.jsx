@@ -1,0 +1,264 @@
+import React, { useState } from 'react'
+import { Link } from 'react-router-dom'
+import AnalystLayout from '../../components/shared/AnalystLayout.jsx'
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  BarChart,
+  Bar
+} from 'recharts'
+
+/**
+ * A5 仪表盘 —— 分析人员首页
+ * - 普通视图：核心指标 + 最近会话
+ * - Admin 全局视图：问题统计 + 趋势图表
+ */
+export default function DashboardPage() {
+  const [view, setView] = useState('normal') // normal | admin
+
+  // 模拟趋势数据
+  const trendData = [
+    { day: '08-06', sessions: 5, issues: 2 },
+    { day: '08-07', sessions: 8, issues: 4 },
+    { day: '08-08', sessions: 6, issues: 3 },
+    { day: '08-09', sessions: 12, issues: 7 },
+    { day: '08-10', sessions: 15, issues: 8 },
+    { day: '08-11', sessions: 10, issues: 5 },
+    { day: '08-12', sessions: 18, issues: 11 }
+  ]
+
+  const issueDist = [
+    { type: '文案歧义', count: 8 },
+    { type: '视觉层级', count: 6 },
+    { type: '流程冗长', count: 4 },
+    { type: '交互反馈', count: 3 },
+    { type: '信息架构', count: 2 }
+  ]
+
+  const recentSessions = [
+    { id: 'UX-0812-0037', participant: 'P-042', severity: 'P0', time: '13:21' },
+    { id: 'UX-0812-0036', participant: 'P-041', severity: 'P1', time: '13:15' },
+    { id: 'UX-0812-0035', participant: 'P-040', severity: 'P0', time: '13:08' },
+    { id: 'UX-0812-0034', participant: 'P-039', severity: 'P2', time: '12:55' }
+  ]
+
+  return (
+    <AnalystLayout>
+      <div className="p-6">
+        {/* 页头 */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-lg font-semibold text-slate-100">仪表盘</h1>
+            <p className="text-xs text-slate-500 mt-0.5">欢迎回来，今日已发现 11 个 UX 问题</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setView('normal')}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-mono transition-colors ${
+                view === 'normal'
+                  ? 'bg-cyan-glow/15 text-cyan-glow border border-cyan-glow/25'
+                  : 'text-slate-500 border border-transparent hover:text-slate-300'
+              }`}
+            >
+              普通视图
+            </button>
+            <button
+              onClick={() => setView('admin')}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-mono transition-colors ${
+                view === 'admin'
+                  ? 'bg-cyan-glow/15 text-cyan-glow border border-cyan-glow/25'
+                  : 'text-slate-500 border border-transparent hover:text-slate-300'
+              }`}
+            >
+              Admin 全局视图
+            </button>
+          </div>
+        </div>
+
+        {/* 核心指标 */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          <StatCard label="今日会话" value="18" delta="↑ 80%" color="text-cyan-glow" />
+          <StatCard label="发现问题" value="11" delta="↑ 37%" color="text-danger" />
+          <StatCard label="P0 紧急" value="4" delta="+2" color="text-danger" />
+          <StatCard label="已生成报告" value="9" delta="↑ 50%" color="text-emerald-400" />
+        </div>
+
+        {/* 普通视图 */}
+        {view === 'normal' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* 最近会话 */}
+            <div className="lg:col-span-2 glass rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[12px] font-mono text-slate-400 tracking-wide">
+                  RECENT_SESSIONS · 最近会话
+                </span>
+                <Link to="/sessions" className="text-[10px] font-mono text-cyan-glow hover:underline">
+                  查看全部 →
+                </Link>
+              </div>
+              <div className="space-y-2">
+                {recentSessions.map((s) => (
+                  <Link
+                    key={s.id}
+                    to={`/sessions/${s.id}`}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-ink-800/40 border border-cyan-glow/10 hover:border-cyan-glow/25 transition-colors"
+                  >
+                    <span
+                      className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold ${
+                        s.severity === 'P0'
+                          ? 'bg-danger/15 text-danger'
+                          : s.severity === 'P1'
+                          ? 'bg-warn/15 text-warn'
+                          : 'bg-cyan-soft/15 text-cyan-soft'
+                      }`}
+                    >
+                      {s.severity}
+                    </span>
+                    <span className="text-[11px] font-mono text-slate-300 flex-1">{s.id}</span>
+                    <span className="text-[10px] text-slate-500">{s.participant}</span>
+                    <span className="text-[10px] text-slate-500">{s.time}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            {/* 快速入口 */}
+            <div className="glass rounded-xl p-4">
+              <div className="text-[12px] font-mono text-slate-400 tracking-wide mb-3">
+                QUICK_ACTIONS · 快速操作
+              </div>
+              <div className="space-y-2">
+                <QuickAction to="/tasks" label="创建新任务" icon="＋" />
+                <QuickAction to="/sessions" label="查看会话列表" icon="◫" />
+                <QuickAction to="/tasks" label="生成测试链接" icon="🔗" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Admin 全局视图 */}
+        {view === 'admin' && (
+          <div className="space-y-4">
+            {/* 趋势图 */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="glass rounded-xl p-4">
+                <div className="text-[12px] font-mono text-slate-400 tracking-wide mb-3">
+                  SESSION_TREND · 会话趋势（近 7 天）
+                </div>
+                <div className="h-[180px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={trendData}>
+                      <defs>
+                        <linearGradient id="sessGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#22E6C8" stopOpacity={0.3} />
+                          <stop offset="100%" stopColor="#22E6C8" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid stroke="rgba(34,230,200,0.08)" strokeDasharray="3 3" />
+                      <XAxis dataKey="day" tick={{ fill: '#64748b', fontSize: 10 }} stroke="rgba(34,230,200,0.15)" />
+                      <YAxis tick={{ fill: '#64748b', fontSize: 10 }} stroke="rgba(34,230,200,0.15)" />
+                      <Tooltip
+                        contentStyle={{
+                          background: 'rgba(11,16,24,0.95)',
+                          border: '1px solid rgba(34,230,200,0.25)',
+                          borderRadius: 8,
+                          fontSize: 11,
+                          color: '#e6edf6'
+                        }}
+                      />
+                      <Area type="monotone" dataKey="sessions" stroke="#22E6C8" fill="url(#sessGrad)" strokeWidth={2} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="glass rounded-xl p-4">
+                <div className="text-[12px] font-mono text-slate-400 tracking-wide mb-3">
+                  ISSUE_DISTRIBUTION · 问题类型分布
+                </div>
+                <div className="h-[180px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={issueDist} layout="vertical">
+                      <CartesianGrid stroke="rgba(34,230,200,0.08)" strokeDasharray="3 3" />
+                      <XAxis type="number" tick={{ fill: '#64748b', fontSize: 10 }} stroke="rgba(34,230,200,0.15)" />
+                      <YAxis dataKey="type" type="category" tick={{ fill: '#94a3b8', fontSize: 10 }} stroke="rgba(34,230,200,0.15)" width={70} />
+                      <Tooltip
+                        contentStyle={{
+                          background: 'rgba(11,16,24,0.95)',
+                          border: '1px solid rgba(34,230,200,0.25)',
+                          borderRadius: 8,
+                          fontSize: 11,
+                          color: '#e6edf6'
+                        }}
+                      />
+                      <Bar dataKey="count" fill="#3FB7FF" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+
+            {/* Admin 指标 */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <StatCard label="累计会话" value="156" delta="+18" color="text-cyan-glow" />
+              <StatCard label="累计问题" value="84" delta="+11" color="text-danger" />
+              <StatCard label="Agent 调用" value="132" delta="+9" color="text-cyan-soft" />
+              <StatCard label="被试人数" value="48" delta="+6" color="text-emerald-400" />
+            </div>
+
+            {/* 系统设置入口 */}
+            <div className="glass rounded-xl p-4">
+              <div className="text-[12px] font-mono text-slate-400 tracking-wide mb-3">
+                SYSTEM · 系统设置
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <SettingItem label="Qwen3-VL API" value="已配置" status="ok" />
+                <SettingItem label="MediaPipe 模型" value="face_mesh_v2" status="ok" />
+                <SettingItem label="数据存储" value="本地 / 2.3 GB" status="ok" />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </AnalystLayout>
+  )
+}
+
+function StatCard({ label, value, delta, color }) {
+  return (
+    <div className="glass rounded-xl p-4">
+      <div className="text-[10px] text-slate-500 font-mono">{label}</div>
+      <div className={`text-[20px] font-bold font-mono mt-1 ${color}`}>{value}</div>
+      <div className="text-[10px] text-slate-500 mt-0.5">{delta}</div>
+    </div>
+  )
+}
+
+function QuickAction({ to, label, icon }) {
+  return (
+    <Link
+      to={to}
+      className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-ink-800/40 border border-cyan-glow/10 hover:border-cyan-glow/25 hover:bg-ink-800/60 transition-colors"
+    >
+      <span className="text-cyan-glow text-sm">{icon}</span>
+      <span className="text-[12px] text-slate-300">{label}</span>
+    </Link>
+  )
+}
+
+function SettingItem({ label, value, status }) {
+  return (
+    <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-ink-800/40 border border-cyan-glow/10">
+      <span className="text-[11px] text-slate-400">{label}</span>
+      <div className="flex items-center gap-1.5">
+        <span className="text-[10px] font-mono text-slate-300">{value}</span>
+        <span className={`w-1.5 h-1.5 rounded-full ${status === 'ok' ? 'bg-emerald-400' : 'bg-warn'}`} />
+      </div>
+    </div>
+  )
+}

@@ -1,0 +1,131 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  background: #070a0f;
+  color: #e6edf6;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(34, 230, 200, 0.18);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(34, 230, 200, 0.32);
+}
+
+/* 网格背景 */
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(34, 230, 200, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34, 230, 200, 0.05) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.bg-radial {
+  background:
+    radial-gradient(1200px 600px at 0% -10%, rgba(34, 230, 200, 0.12), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(63, 183, 255, 0.1), transparent 55%),
+    #070a0f;
+}
+
+/* 玻璃拟态卡片 */
+.glass {
+  background: linear-gradient(180deg, rgba(26, 34, 49, 0.72), rgba(17, 24, 36, 0.72));
+  border: 1px solid rgba(34, 230, 200, 0.14);
+  backdrop-filter: blur(8px);
+}
+
+.glass-strong {
+  background: linear-gradient(180deg, rgba(26, 34, 49, 0.92), rgba(11, 16, 24, 0.92));
+  border: 1px solid rgba(34, 230, 200, 0.2);
+  backdrop-filter: blur(10px);
+}
+
+/* 渐变文字 */
+.text-gradient {
+  background: linear-gradient(90deg, #22e6c8 0%, #3fb7ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* 扫描线 */
+.scanline {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.scanline::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 30%;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(34, 230, 200, 0.08) 50%,
+    transparent 100%
+  );
+  animation: scan 2.4s linear infinite;
+}
+
+/* 弹窗弹出动画 */
+@keyframes popIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.9) translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* 淡入 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 骨架屏 shimmer */
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.03) 0%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.03) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
