@@ -81,7 +81,12 @@ export function createApiRouter({ store, config }) {
       const task = store.getPublicTask(decodeURIComponent(publicTaskMatch[1]))
       if (!task) throw new HttpError(404, '测试链接无效或任务已暂停', 'TASK_NOT_AVAILABLE')
       const { token: _token, ...publicTask } = task
-      sendJson(response, 200, { task: publicTask })
+      sendJson(response, 200, {
+        task: {
+          ...publicTask,
+          diagnosisProvider: config.dashscopeApiKey ? 'dashscope' : 'local-rules'
+        }
+      })
       return true
     }
 

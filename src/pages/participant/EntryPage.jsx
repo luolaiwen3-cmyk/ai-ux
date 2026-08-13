@@ -167,6 +167,9 @@ export default function EntryPage() {
                     <ConsentItem>采集页面点击、滚动、停留和鼠标轨迹用于回放分析</ConsentItem>
                     <ConsentItem>采集面部关键点、情绪估测和低清缩略图，不保存连续原始视频</ConsentItem>
                     <ConsentItem>数据保存在本次 InsightUX 私有部署中，仅供 UX 研究使用</ConsentItem>
+                    {task.diagnosisProvider === 'dashscope'
+                      ? <ConsentItem>诊断时，会话指标和最多三张低清缩略图将发送至部署方配置的阿里云百炼 Qwen 服务</ConsentItem>
+                      : <ConsentItem>本次诊断使用私有部署内的本地规则引擎，不向外部 AI 服务发送采集数据</ConsentItem>}
                     <ConsentItem>任务提交前可以主动退出并删除本次采集数据</ConsentItem>
                   </ul>
                 </div>

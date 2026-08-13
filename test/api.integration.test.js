@@ -70,6 +70,7 @@ test('API 完成登录、任务、匿名会话、诊断和分享报告主链路'
     const publicTask = await jsonRequest(`${api.baseUrl}/api/public/tasks/${task.token}`)
     assert.equal(publicTask.data.task.name, task.name)
     assert.equal(publicTask.data.task.token, undefined)
+    assert.equal(publicTask.data.task.diagnosisProvider, 'local-rules')
 
     const createdSession = await jsonRequest(`${api.baseUrl}/api/public/tasks/${task.token}/sessions`, {
       method: 'POST',
