@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  .task-action {
+    @apply px-2.5 py-1.5 rounded border border-slate-700 text-[10px] text-slate-400 hover:text-cyan-glow hover:border-cyan-glow/30 transition-colors;
+  }
+}
+
 :root {
   color-scheme: dark;
 }

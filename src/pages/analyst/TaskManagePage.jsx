@@ -1,34 +1,28 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import AnalystLayout from '../../components/shared/AnalystLayout.jsx'
 import { api } from '../../lib/apiClient.js'
 
-const DEFAULT_STEPS = [
-  '确认购物车中的商品',
-  '处理优惠券提示',
-  '提交订单'
-]
-
-const statusLabels = {
-  active: '进行中',
-  draft: '草稿',
-  paused: '已暂停'
-}
+const DEFAULT_STEPS = ['确认页面内容', '完成指定操作', '点击完成测试']
+const statusLabels = { active: '进行中', draft: '草稿', paused: '已暂停' }
+const targetLabels = { builtin: '内置结算模板', upload: '上传静态网站', url: '外部 URL' }
+const initialTask = () => ({
+  name: '', description: '', steps: DEFAULT_STEPS.join('\n'), status: 'active',
+  targetType: 'builtin', targetUrl: '', siteFile: null
+})
 
 export default function TaskManagePage() {
   const [tasks, setTasks] = useState([])
+  const [publicAppUrl, setPublicAppUrl] = useState(window.location.origin)
   const [showCreate, setShowCreate] = useState(false)
+  const [createStep, setCreateStep] = useState(1)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [copiedId, setCopiedId] = useState('')
   const [editingId, setEditingId] = useState('')
   const [editTask, setEditTask] = useState(null)
-  const [newTask, setNewTask] = useState({
-    name: '',
-    description: '',
-    steps: DEFAULT_STEPS.join('\n'),
-    status: 'active'
-  })
+  const [validatingId, setValidatingId] = useState('')
+  const [newTask, setNewTask] = useState(initialTask)
 
   const loadTasks = useCallback(async () => {
     setLoading(true)
@@ -36,34 +30,48 @@ export default function TaskManagePage() {
     try {
       const result = await api.tasks.list()
       setTasks(result.tasks)
-    } catch (err) {
-      setError(err.message)
+      if (result.publicAppUrl) setPublicAppUrl(result.publicAppUrl)
+    } catch (requestError) {
+      setError(requestError.message)
     } finally {
       setLoading(false)
     }
   }, [])
 
-  useEffect(() => {
-    loadTasks()
-  }, [loadTasks])
+  useEffect(() => { loadTasks() }, [loadTasks])
+
+  const replaceTask = (task) => setTasks((current) => current.map((item) => item.id === task.id ? task : item))
 
   const handleCreate = async () => {
-    const steps = newTask.steps.split('\n').map((step) => step.trim()).filter(Boolean)
+    const steps = parseSteps(newTask.steps)
     if (!newTask.name.trim() || steps.length === 0) return
+    if (newTask.targetType === 'upload' && !newTask.siteFile) {
+      setError('请选择包含 index.html 的 ZIP 文件')
+      return
+    }
     setSaving(true)
     setError('')
     try {
+      const requestedStatus = newTask.status
       const result = await api.tasks.create({
-        name: newTask.name.trim(),
-        description: newTask.description.trim(),
-        steps,
-        status: newTask.status
+        name: newTask.name.trim(), description: newTask.description.trim(), steps,
+        targetType: newTask.targetType,
+        targetUrl: newTask.targetType === 'url' ? newTask.targetUrl.trim() : undefined,
+        status: newTask.targetType === 'builtin' ? requestedStatus : 'draft'
       })
-      setTasks((current) => [result.task, ...current])
-      setNewTask({ name: '', description: '', steps: DEFAULT_STEPS.join('\n'), status: 'active' })
+      let task = result.task
+      if (newTask.targetType === 'upload') {
+        task = (await api.tasks.uploadSite(task.id, newTask.siteFile)).task
+        if (requestedStatus === 'active') task = (await api.tasks.update(task.id, { status: 'active' })).task
+      }
+      setTasks((current) => [task, ...current])
+      setNewTask(initialTask())
+      setCreateStep(1)
       setShowCreate(false)
-    } catch (err) {
-      setError(err.message)
+      if (task.targetType === 'url') setValidatingId(task.id)
+    } catch (requestError) {
+      setError(requestError.message)
+      await loadTasks()
     } finally {
       setSaving(false)
     }
@@ -71,136 +79,71 @@ export default function TaskManagePage() {
 
   const updateStatus = async (task, status) => {
     setError('')
-    try {
-      const result = await api.tasks.update(task.id, { status })
-      setTasks((current) => current.map((item) => item.id === task.id ? result.task : item))
-    } catch (err) {
-      setError(err.message)
-    }
+    try { replaceTask((await api.tasks.update(task.id, { status })).task) }
+    catch (requestError) { setError(requestError.message) }
+  }
+
+  const uploadReplacement = async (task, file) => {
+    if (!file) return
+    setSaving(true)
+    setError('')
+    try { replaceTask((await api.tasks.uploadSite(task.id, file)).task) }
+    catch (requestError) { setError(requestError.message) }
+    finally { setSaving(false) }
   }
 
   const beginEdit = (task) => {
     setEditingId(task.id)
-    setEditTask({
-      name: task.name,
-      description: task.description,
-      steps: task.steps.join('\n')
-    })
+    setEditTask({ name: task.name, description: task.description, steps: task.steps.join('\n'), targetUrl: task.targetUrl || '' })
   }
 
   const saveEdit = async () => {
-    const steps = editTask.steps.split('\n').map((step) => step.trim()).filter(Boolean)
+    const steps = parseSteps(editTask.steps)
     if (!editTask.name.trim() || steps.length === 0) return
     setSaving(true)
     setError('')
     try {
+      const current = tasks.find((item) => item.id === editingId)
       const result = await api.tasks.update(editingId, {
-        name: editTask.name.trim(),
-        description: editTask.description.trim(),
-        steps
+        name: editTask.name.trim(), description: editTask.description.trim(), steps,
+        ...(current?.targetType === 'url' ? { targetUrl: editTask.targetUrl.trim() } : {})
       })
-      setTasks((current) => current.map((item) => item.id === editingId ? result.task : item))
+      replaceTask(result.task)
       setEditingId('')
       setEditTask(null)
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setSaving(false)
-    }
+    } catch (requestError) { setError(requestError.message) }
+    finally { setSaving(false) }
   }
 
   const taskLink = (task) => `${window.location.origin}${window.location.pathname}#/join/${task.token}`
+  const targetUrl = (task) => task.targetType === 'upload'
+    ? `/test-content/${task.contentToken}/index.html`
+    : task.targetUrl
+  const sdkSnippet = (task) => {
+    const sdkOrigin = new URL(publicAppUrl, window.location.origin).origin
+    return `<script src="${sdkOrigin}/insightux-recorder.js" data-task-id="${task.id}" data-parent-origin="${window.location.origin}"></script>`
+  }
 
-  const copyLink = async (task) => {
+  const copyText = async (id, value) => {
     try {
-      await navigator.clipboard.writeText(taskLink(task))
-      setCopiedId(task.id)
+      await navigator.clipboard.writeText(value)
+      setCopiedId(id)
       window.setTimeout(() => setCopiedId(''), 1600)
-    } catch {
-      setError('复制失败，请手动选择测试链接')
-    }
+    } catch { setError('复制失败，请手动选择文本') }
   }
 
   return (
     <AnalystLayout>
       <div className="p-6">
         <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-lg font-semibold text-slate-100">任务管理</h1>
-            <p className="text-xs text-slate-500 mt-0.5">创建并发布真实可参与的测试任务</p>
-          </div>
-          <button
-            onClick={() => setShowCreate(true)}
-            className="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-glow/90 to-cyan-soft/90 text-ink-900 text-xs font-semibold hover:shadow-glow transition-all"
-          >
-            + 新建任务
-          </button>
+          <div><h1 className="text-lg font-semibold text-slate-100">任务管理</h1><p className="text-xs text-slate-500 mt-0.5">上传网页、验证录制并发布真实测试</p></div>
+          <button onClick={() => { setShowCreate(true); setCreateStep(1) }} className="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-glow/90 to-cyan-soft/90 text-ink-900 text-xs font-semibold">+ 新建任务</button>
         </div>
 
-        {error && (
-          <div role="alert" className="mb-4 px-4 py-3 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700">
-            {error}
-          </div>
-        )}
+        {error && <div role="alert" className="mb-4 px-4 py-3 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700">{error}</div>}
+        {showCreate && <CreateWizard task={newTask} setTask={setNewTask} step={createStep} setStep={setCreateStep} saving={saving} onCreate={handleCreate} onCancel={() => setShowCreate(false)} />}
 
-        {showCreate && (
-          <div className="glass rounded-xl p-5 mb-6 animate-[fadeIn_.3s_ease-out]">
-            <div className="text-[12px] font-mono text-slate-400 tracking-wide mb-4">NEW_TASK · 创建新任务</div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Field label="任务名称">
-                <input
-                  value={newTask.name}
-                  onChange={(event) => setNewTask({ ...newTask, name: event.target.value })}
-                  placeholder="如：首页改版测试"
-                  className="form-control"
-                />
-              </Field>
-              <Field label="发布状态">
-                <select
-                  value={newTask.status}
-                  onChange={(event) => setNewTask({ ...newTask, status: event.target.value })}
-                  className="form-control"
-                >
-                  <option value="active">创建后立即发布</option>
-                  <option value="draft">保存为草稿</option>
-                </select>
-              </Field>
-              <Field label="被试说明">
-                <textarea
-                  value={newTask.description}
-                  onChange={(event) => setNewTask({ ...newTask, description: event.target.value })}
-                  rows={4}
-                  placeholder="被试进入后看到的任务说明"
-                  className="form-control resize-none"
-                />
-              </Field>
-              <Field label="任务步骤（每行一项）">
-                <textarea
-                  value={newTask.steps}
-                  onChange={(event) => setNewTask({ ...newTask, steps: event.target.value })}
-                  rows={4}
-                  className="form-control resize-none"
-                />
-              </Field>
-            </div>
-            <div className="flex justify-end gap-2 mt-4">
-              <button onClick={() => setShowCreate(false)} className="px-4 py-2 rounded-lg border border-slate-200 text-xs text-slate-600">取消</button>
-              <button
-                onClick={handleCreate}
-                disabled={saving || !newTask.name.trim()}
-                className="px-4 py-2 rounded-lg bg-slate-950 text-white text-xs font-medium disabled:opacity-50"
-              >
-                {saving ? '保存中…' : '创建任务'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {loading ? (
-          <div className="glass rounded-xl p-10 text-center text-sm text-slate-500">正在加载任务…</div>
-        ) : tasks.length === 0 ? (
-          <div className="glass rounded-xl p-10 text-center text-sm text-slate-500">暂无任务，创建第一个测试任务吧。</div>
-        ) : (
+        {loading ? <EmptyState title="正在加载任务…" /> : tasks.length === 0 ? <EmptyState title="暂无任务，创建第一个测试任务吧。" /> : (
           <div className="space-y-3">
             {tasks.map((task) => (
               <div key={task.id} className="glass rounded-xl p-4 hover:border-cyan-glow/25 transition-colors">
@@ -208,50 +151,29 @@ export default function TaskManagePage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-[10px] font-mono text-slate-500">{task.id.slice(0, 8)}</span>
-                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono border ${
-                        task.status === 'active'
-                          ? 'bg-emerald-500/15 text-emerald-500 border-emerald-500/20'
-                          : 'bg-slate-500/10 text-slate-500 border-slate-300'
-                      }`}>
-                        {statusLabels[task.status]}
-                      </span>
+                      <Badge tone={task.status === 'active' ? 'green' : 'gray'}>{statusLabels[task.status]}</Badge>
+                      <Badge tone={task.targetStatus === 'ready' ? 'cyan' : 'amber'}>{targetLabels[task.targetType]} · {task.targetStatus === 'ready' ? '已验证' : '待验证'}</Badge>
                     </div>
                     <div className="text-[14px] font-medium text-slate-100">{task.name}</div>
-                    <div className="text-[11px] text-slate-500 mt-0.5">电商结算页 · {task.steps.length} 个步骤 · 创建于 {new Date(task.createdAt).toLocaleDateString('zh-CN')}</div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">{task.steps.length} 个步骤 · 创建于 {new Date(task.createdAt).toLocaleDateString('zh-CN')}</div>
                     {task.description && <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">{task.description}</p>}
                   </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <div className="text-right">
-                      <div className="text-[14px] font-semibold font-mono text-cyan-glow">{task.sessionCount}</div>
-                      <div className="text-[9px] text-slate-500">会话数</div>
-                    </div>
-                    <button onClick={() => beginEdit(task)} className="px-2.5 py-1.5 rounded border border-slate-200 text-[10px] text-slate-600">编辑</button>
-                    {task.status === 'active' ? (
-                      <button onClick={() => updateStatus(task, 'paused')} className="px-2.5 py-1.5 rounded border border-slate-200 text-[10px] text-slate-600">暂停</button>
-                    ) : (
-                      <button onClick={() => updateStatus(task, 'active')} className="px-2.5 py-1.5 rounded border border-emerald-200 text-[10px] text-emerald-600">发布</button>
-                    )}
+                  <div className="flex flex-wrap justify-end items-center gap-2 shrink-0 max-w-md">
+                    <div className="text-right mr-2"><div className="text-[14px] font-semibold font-mono text-cyan-glow">{task.sessionCount}</div><div className="text-[9px] text-slate-500">正式会话</div></div>
+                    {task.targetStatus === 'ready' && task.targetType !== 'builtin' && <button onClick={() => window.open(targetUrl(task), '_blank', 'noopener,noreferrer')} className="task-action">预览</button>}
+                    {task.targetType === 'url' && <button onClick={() => setValidatingId(validatingId === task.id ? '' : task.id)} className="task-action">{task.targetStatus === 'ready' ? '重新验证' : '接入并验证'}</button>}
+                    {task.targetType === 'upload' && <label className="task-action cursor-pointer">替换 ZIP<input type="file" accept=".zip,application/zip" className="hidden" onChange={(event) => uploadReplacement(task, event.target.files?.[0])} /></label>}
+                    <button onClick={() => beginEdit(task)} className="task-action">编辑</button>
+                    {task.status === 'active'
+                      ? <button onClick={() => updateStatus(task, 'paused')} className="task-action">暂停</button>
+                      : <button onClick={() => updateStatus(task, 'active')} disabled={task.targetStatus !== 'ready'} className="task-action disabled:opacity-40">发布</button>}
                   </div>
                 </div>
 
-                {editingId === task.id && editTask && (
-                  <div className="mt-4 pt-4 border-t border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <Field label="任务名称"><input value={editTask.name} onChange={(event) => setEditTask({ ...editTask, name: event.target.value })} className="form-control" /></Field>
-                    <Field label="被试说明"><textarea rows={3} value={editTask.description} onChange={(event) => setEditTask({ ...editTask, description: event.target.value })} className="form-control resize-none" /></Field>
-                    <div className="md:col-span-2"><Field label="任务步骤（每行一项）"><textarea rows={3} value={editTask.steps} onChange={(event) => setEditTask({ ...editTask, steps: event.target.value })} className="form-control resize-none" /></Field></div>
-                    <div className="md:col-span-2 flex justify-end gap-2"><button onClick={() => { setEditingId(''); setEditTask(null) }} className="px-3 py-2 rounded-lg border border-slate-200 text-xs text-slate-600">取消</button><button onClick={saveEdit} disabled={saving} className="px-3 py-2 rounded-lg bg-slate-950 text-white text-xs disabled:opacity-50">{saving ? '保存中…' : '保存修改'}</button></div>
-                  </div>
-                )}
+                {validatingId === task.id && task.targetType === 'url' && <UrlValidator task={task} snippet={sdkSnippet(task)} onValidated={(updated) => { replaceTask(updated); setValidatingId('') }} onCopy={() => copyText(`sdk-${task.id}`, sdkSnippet(task))} copied={copiedId === `sdk-${task.id}`} />}
+                {editingId === task.id && editTask && <EditForm task={task} value={editTask} setValue={setEditTask} saving={saving} onSave={saveEdit} onCancel={() => { setEditingId(''); setEditTask(null) }} />}
 
-                {task.status === 'active' && (
-                  <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-ink-900/60 border border-cyan-glow/10">
-                    <span className="text-[10px] text-slate-500 shrink-0">测试链接：</span>
-                    <code className="text-[11px] font-mono text-cyan-soft truncate flex-1">{taskLink(task)}</code>
-                    <button onClick={() => copyLink(task)} className="px-2 py-1 rounded text-[10px] font-mono text-slate-400 hover:text-cyan-glow shrink-0">
-                      {copiedId === task.id ? '已复制' : '复制'}
-                    </button>
-                  </div>
-                )}
+                {task.status === 'active' && <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-ink-900/60 border border-cyan-glow/10"><span className="text-[10px] text-slate-500 shrink-0">测试链接：</span><code className="text-[11px] font-mono text-cyan-soft truncate flex-1">{taskLink(task)}</code><button onClick={() => copyText(task.id, taskLink(task))} className="px-2 py-1 text-[10px] font-mono text-slate-400">{copiedId === task.id ? '已复制' : '复制'}</button></div>}
               </div>
             ))}
           </div>
@@ -261,11 +183,53 @@ export default function TaskManagePage() {
   )
 }
 
-function Field({ label, children }) {
-  return (
-    <label className="block">
-      <span className="text-[11px] text-slate-500 mb-1.5 block">{label}</span>
-      {children}
-    </label>
-  )
+function CreateWizard({ task, setTask, step, setStep, saving, onCreate, onCancel }) {
+  const canContinue = step === 1
+    ? task.name.trim() && parseSteps(task.steps).length
+    : step === 2
+      ? (task.targetType === 'upload' ? task.siteFile : task.targetType !== 'url' || task.targetUrl.trim())
+      : true
+  return <div className="glass rounded-xl p-5 mb-6">
+    <div className="flex items-center gap-3 mb-5">{['基本信息', '测试网页', '确认创建'].map((label, index) => <React.Fragment key={label}><div className={`text-xs ${step === index + 1 ? 'text-cyan-glow' : step > index + 1 ? 'text-emerald-400' : 'text-slate-500'}`}>{index + 1}. {label}</div>{index < 2 && <div className="h-px flex-1 bg-slate-700" />}</React.Fragment>)}</div>
+    {step === 1 && <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><Field label="任务名称"><input value={task.name} onChange={(event) => setTask({ ...task, name: event.target.value })} placeholder="如：首页导航测试" className="form-control" /></Field><Field label="被试说明"><textarea rows={4} value={task.description} onChange={(event) => setTask({ ...task, description: event.target.value })} className="form-control resize-none" /></Field><div className="md:col-span-2"><Field label="任务步骤（每行一项）"><textarea rows={4} value={task.steps} onChange={(event) => setTask({ ...task, steps: event.target.value })} className="form-control resize-none" /></Field></div></div>}
+    {step === 2 && <div><div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">{[['builtin', '内置结算模板', '立即可用，保留现有优惠券演示'], ['upload', '上传网站 ZIP', '由 InsightUX 安全托管静态网页'], ['url', '外部网页 URL', '需在目标站安装录制 SDK']].map(([type, title, detail]) => <button key={type} type="button" onClick={() => setTask({ ...task, targetType: type, status: type === 'url' ? 'draft' : task.status })} className={`text-left rounded-xl border p-4 ${task.targetType === type ? 'border-cyan-glow bg-cyan-glow/10' : 'border-slate-700'}`}><div className="text-sm text-slate-100">{title}</div><div className="text-[11px] text-slate-500 mt-1">{detail}</div></button>)}</div>{task.targetType === 'upload' && <Field label="网站 ZIP（根目录必须包含 index.html）"><input type="file" accept=".zip,application/zip" onChange={(event) => setTask({ ...task, siteFile: event.target.files?.[0] || null })} className="form-control" /></Field>}{task.targetType === 'url' && <Field label="测试网页 URL"><input value={task.targetUrl} onChange={(event) => setTask({ ...task, targetUrl: event.target.value })} placeholder="https://product.example.com/test" className="form-control" /></Field>}</div>}
+    {step === 3 && <div className="rounded-xl border border-slate-700 p-4 text-xs text-slate-400 space-y-2"><p>任务：<span className="text-slate-100">{task.name}</span></p><p>网页：<span className="text-slate-100">{targetLabels[task.targetType]}</span></p>{task.targetType === 'url' && <p className="text-amber-400">创建后需安装 SDK 并通过连接验证，之后才能发布。</p>}<Field label="创建后状态"><select value={task.status} onChange={(event) => setTask({ ...task, status: event.target.value })} disabled={task.targetType === 'url'} className="form-control"><option value="active">验证后立即发布</option><option value="draft">保存为草稿</option></select></Field></div>}
+    <div className="flex justify-between mt-5"><button onClick={step === 1 ? onCancel : () => setStep(step - 1)} className="task-action">{step === 1 ? '取消' : '上一步'}</button>{step < 3 ? <button onClick={() => setStep(step + 1)} disabled={!canContinue} className="px-4 py-2 rounded-lg bg-slate-950 text-white text-xs disabled:opacity-40">下一步</button> : <button onClick={onCreate} disabled={saving} className="px-4 py-2 rounded-lg bg-cyan-glow text-ink-900 text-xs font-semibold disabled:opacity-40">{saving ? '创建中…' : '创建任务'}</button>}</div>
+  </div>
 }
+
+function UrlValidator({ task, snippet, onValidated, onCopy, copied }) {
+  const frameRef = useRef(null)
+  const [state, setState] = useState('waiting')
+  const [message, setMessage] = useState('请先把下方 SDK 代码加入目标网页，然后等待连接。')
+  const origin = useMemo(() => { try { return new URL(task.targetUrl).origin } catch { return '' } }, [task.targetUrl])
+  useEffect(() => {
+    const timeout = window.setTimeout(() => { setState('error'); setMessage('10 秒内未收到 SDK 握手。请确认代码已部署且网页允许 iframe。') }, 10000)
+    const listener = async (event) => {
+      const data = event.data
+      if (event.source !== frameRef.current?.contentWindow || event.origin !== origin) return
+      if (data?.channel !== 'insightux-recorder' || data.type !== 'READY' || data.taskId !== task.id) return
+      window.clearTimeout(timeout)
+      setState('checking')
+      setMessage('SDK 已连接，正在保存验证结果…')
+      try {
+        const result = await api.tasks.validateUrl(task.id, { origin: event.origin, sdkVersion: data.version })
+        setState('ready')
+        setMessage('验证通过，可以发布并试跑。')
+        onValidated(result.task)
+      } catch (error) { setState('error'); setMessage(error.message) }
+    }
+    window.addEventListener('message', listener)
+    return () => { window.clearTimeout(timeout); window.removeEventListener('message', listener) }
+  }, [task.id, origin, onValidated])
+  return <div className="mt-4 pt-4 border-t border-slate-700 grid grid-cols-1 lg:grid-cols-2 gap-4"><div><div className="text-xs text-slate-300 mb-2">1. 将录制 SDK 放入目标网页的 HTML：</div><div className="rounded-lg bg-black/40 border border-slate-700 p-3 flex gap-2"><code className="text-[10px] text-cyan-soft break-all flex-1">{snippet}</code><button onClick={onCopy} className="text-[10px] text-slate-400 shrink-0">{copied ? '已复制' : '复制'}</button></div><div className={`mt-3 text-xs ${state === 'error' ? 'text-red-400' : state === 'ready' ? 'text-emerald-400' : 'text-amber-400'}`}>{message}</div></div><div className="rounded-lg overflow-hidden bg-white h-56"><iframe ref={frameRef} title={`验证 ${task.name}`} src={task.targetUrl} sandbox="allow-scripts allow-forms allow-modals allow-popups allow-same-origin" className="w-full h-full border-0" /></div></div>
+}
+
+function EditForm({ task, value, setValue, saving, onSave, onCancel }) {
+  return <div className="mt-4 pt-4 border-t border-slate-700 grid grid-cols-1 md:grid-cols-2 gap-3"><Field label="任务名称"><input value={value.name} onChange={(event) => setValue({ ...value, name: event.target.value })} className="form-control" /></Field><Field label="被试说明"><textarea rows={3} value={value.description} onChange={(event) => setValue({ ...value, description: event.target.value })} className="form-control resize-none" /></Field>{task.targetType === 'url' && <div className="md:col-span-2"><Field label="测试网页 URL（修改后需要重新验证）"><input value={value.targetUrl} onChange={(event) => setValue({ ...value, targetUrl: event.target.value })} className="form-control" /></Field></div>}<div className="md:col-span-2"><Field label="任务步骤（每行一项）"><textarea rows={3} value={value.steps} onChange={(event) => setValue({ ...value, steps: event.target.value })} className="form-control resize-none" /></Field></div><div className="md:col-span-2 flex justify-end gap-2"><button onClick={onCancel} className="task-action">取消</button><button onClick={onSave} disabled={saving} className="px-3 py-2 rounded-lg bg-slate-950 text-white text-xs disabled:opacity-50">{saving ? '保存中…' : '保存修改'}</button></div></div>
+}
+
+function Field({ label, children }) { return <label className="block"><span className="text-[11px] text-slate-500 mb-1.5 block">{label}</span>{children}</label> }
+function Badge({ tone, children }) { const colors = { green: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20', cyan: 'bg-cyan-glow/10 text-cyan-glow border-cyan-glow/20', amber: 'bg-amber-500/10 text-amber-400 border-amber-500/20', gray: 'bg-slate-500/10 text-slate-500 border-slate-700' }; return <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono border ${colors[tone]}`}>{children}</span> }
+function EmptyState({ title }) { return <div className="glass rounded-xl p-10 text-center text-sm text-slate-500">{title}</div> }
+function parseSteps(value) { return value.split('\n').map((step) => step.trim()).filter(Boolean) }
