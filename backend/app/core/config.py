@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     database_url: str = f"sqlite:///{REPO_ROOT / 'data' / 'insightux.sqlite3'}"
     data_dir: Path = REPO_ROOT / "data"
     frontend_dist: Path = REPO_ROOT / "frontend" / "dist"
+    admin_username: str = "admin"
+    admin_password_hash: str = "$argon2id$v=19$m=65536,t=3,p=4$EFNOGECJKs0HIhq3bJFOkw$m1bXlueXElILAeOCrbtIlAkVbvjyZWoyRyLsN6Lm1Ek"
+    session_secret: str = "development-only-change-me"
+    session_ttl_seconds: int = 8 * 60 * 60
 
 
 @lru_cache

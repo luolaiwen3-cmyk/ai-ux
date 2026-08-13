@@ -21,3 +21,10 @@ def client(tmp_path):
         yield test_client
     app.dependency_overrides.clear()
     engine.dispose()
+
+
+@pytest.fixture
+def authenticated_client(client):
+    response = client.post("/api/auth/login", json={"username": "admin", "password": "admin123"})
+    assert response.status_code == 200
+    return client

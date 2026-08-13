@@ -11,6 +11,8 @@ const TaskManagePage = lazy(() => import('./pages/analyst/TaskManagePage.jsx'))
 const SessionListPage = lazy(() => import('./pages/analyst/SessionListPage.jsx'))
 const SessionDetailPage = lazy(() => import('./pages/analyst/SessionDetailPage.jsx'))
 const ReportPage = lazy(() => import('./pages/analyst/ReportPage.jsx'))
+const LoginPage = lazy(() => import('./pages/analyst/LoginPage.jsx'))
+const AuthGate = lazy(() => import('./components/shared/AuthGate.jsx'))
 
 function PageFallback() {
   return (
@@ -33,11 +35,12 @@ export default function App() {
           <Route path="/thanks" element={<ThanksPage />} />
 
           {/* 分析人员端（需登录，此处简化） */}
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/tasks" element={<TaskManagePage />} />
-          <Route path="/sessions" element={<SessionListPage />} />
-          <Route path="/sessions/:id" element={<SessionDetailPage />} />
-          <Route path="/report/:id" element={<ReportPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/" element={<AuthGate><DashboardPage /></AuthGate>} />
+          <Route path="/tasks" element={<AuthGate><TaskManagePage /></AuthGate>} />
+          <Route path="/sessions" element={<AuthGate><SessionListPage /></AuthGate>} />
+          <Route path="/sessions/:id" element={<AuthGate><SessionDetailPage /></AuthGate>} />
+          <Route path="/report/:id" element={<AuthGate><ReportPage /></AuthGate>} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

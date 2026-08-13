@@ -5,6 +5,8 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.health import router as health_router
+from app.api.auth import router as auth_router
+from app.api.tasks import router as tasks_router
 from app.core.config import get_settings
 
 
@@ -19,6 +21,8 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="InsightUX API", version="0.1.0", lifespan=lifespan)
 app.include_router(health_router, prefix="/api")
+app.include_router(auth_router, prefix="/api")
+app.include_router(tasks_router, prefix="/api")
 
 settings = get_settings()
 assets_dir = settings.frontend_dist / "assets"
