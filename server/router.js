@@ -253,6 +253,16 @@ export function createApiRouter({ store, config, siteStorage = null }) {
       return true
     }
 
+    const trialMatch = pathname.match(/^\/api\/tasks\/([^/]+)\/trials$/)
+    if (request.method === 'POST' && trialMatch) {
+      const id = decodeURIComponent(trialMatch[1])
+      const task = store.getTask(id)
+      if (!task) throw new HttpError(404, '任务不存在', 'TASK_NOT_FOUND')
+      const session = store.createSession(id, { mode: 'trial', allowInactive: true })
+      sendJson(response, 201, { session })
+      return true
+    }
+
     const taskMatch = pathname.match(/^\/api\/tasks\/([^/]+)$/)
     if (taskMatch) {
       const id = decodeURIComponent(taskMatch[1])
@@ -273,7 +283,8 @@ export function createApiRouter({ store, config, siteStorage = null }) {
       const status = url.searchParams.get('status') || undefined
       if (status && !SESSION_STATUSES.has(status)) throw new HttpError(400, '会话状态无效', 'VALIDATION_ERROR')
       const sort = url.searchParams.get('sort') === 'asc' ? 'asc' : 'desc'
-      sendJson(response, 200, { sessions: store.listSessions({ status, sort }) })
+      const scope = ['participant', 'trial', 'all'].includes(url.searchParams.get('scope')) ? url.searchParams.get('scope') : 'participant'
+      sendJson(response, 200, { sessions: store.listSessions({ status, sort, scope }) })
       return true
     }
 
@@ -295,6 +306,7 @@ export function createApiRouter({ store, config, siteStorage = null }) {
       const session = store.getSession(decodeURIComponent(diagnoseMatch[1]))
       if (!session) throw new HttpError(404, '会话不存在', 'SESSION_NOT_FOUND')
       if (session.status !== 'completed') throw new HttpError(409, '会话完成后才能诊断', 'SESSION_NOT_COMPLETED')
+      if (session.mode === 'trial') throw new HttpError(409, '试跑会话不生成诊断或报告', 'TRIAL_DIAGNOSIS_DISABLED')
       const diagnosis = await diagnoseSession(session, config)
       sendJson(response, 200, { diagnosis: store.saveDiagnosis(session.id, diagnosis) })
       return true

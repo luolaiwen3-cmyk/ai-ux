@@ -90,14 +90,16 @@ export const api = {
     create: (input) => request('/api/tasks', { method: 'POST', body: input }),
     update: (id, input) => request(`/api/tasks/${encodeURIComponent(id)}`, { method: 'PATCH', body: input }),
     uploadSite: (id, file) => uploadZip(`/api/tasks/${encodeURIComponent(id)}/site`, file),
-    validateUrl: (id, input) => request(`/api/tasks/${encodeURIComponent(id)}/validate-url`, { method: 'POST', body: input })
+    validateUrl: (id, input) => request(`/api/tasks/${encodeURIComponent(id)}/validate-url`, { method: 'POST', body: input }),
+    createTrial: (id) => request(`/api/tasks/${encodeURIComponent(id)}/trials`, { method: 'POST' })
   },
 
   sessions: {
-    list: ({ status, sort = 'desc' } = {}) => {
+    list: ({ status, sort = 'desc', scope = 'participant' } = {}) => {
       const query = new URLSearchParams()
       if (status) query.set('status', status)
       query.set('sort', sort)
+      query.set('scope', scope)
       return request(`/api/sessions?${query}`)
     },
     get: (id) => request(`/api/sessions/${encodeURIComponent(id)}`),

@@ -148,3 +148,34 @@ test('URL 任务必须完成匹配的 SDK 握手才能发布', async () => {
     await api.close()
   }
 })
+
+test('管理员试跑会话可执行但不会进入正式列表或诊断', async () => {
+  const api = await startTestApi()
+  try {
+    const login = await jsonRequest(`${api.baseUrl}/api/auth/login`, {
+      method: 'POST', body: JSON.stringify({ password: 'test-password' })
+    })
+    const cookie = login.response.headers.get('set-cookie').split(';')[0]
+    const created = await jsonRequest(`${api.baseUrl}/api/tasks`, {
+      method: 'POST', headers: { Cookie: cookie },
+      body: JSON.stringify({ name: '试跑任务', description: '', steps: ['完成'], status: 'draft', targetType: 'builtin' })
+    })
+    const trial = await jsonRequest(`${api.baseUrl}/api/tasks/${created.data.task.id}/trials`, {
+      method: 'POST', headers: { Cookie: cookie }
+    })
+    assert.equal(trial.data.session.participantCode, 'T-001')
+    const tokenHeaders = { 'X-Session-Token': trial.data.session.uploadToken }
+    await jsonRequest(`${api.baseUrl}/api/public/sessions/${trial.data.session.id}/start`, { method: 'POST', headers: tokenHeaders })
+    await jsonRequest(`${api.baseUrl}/api/public/sessions/${trial.data.session.id}/complete`, {
+      method: 'POST', headers: tokenHeaders,
+      body: JSON.stringify({ couponDecision: 'none', events: [{ type: 0, timestamp: 1 }], faceFrames: [], result: { completion: 'manual' } })
+    })
+    const formal = await jsonRequest(`${api.baseUrl}/api/sessions?scope=participant`, { headers: { Cookie: cookie } })
+    const trials = await jsonRequest(`${api.baseUrl}/api/sessions?scope=trial`, { headers: { Cookie: cookie } })
+    assert.equal(formal.data.sessions.length, 0)
+    assert.equal(trials.data.sessions.length, 1)
+    const diagnosis = await jsonRequest(`${api.baseUrl}/api/sessions/${trial.data.session.id}/diagnose`, { method: 'POST', headers: { Cookie: cookie } })
+    assert.equal(diagnosis.response.status, 409)
+    assert.equal(diagnosis.data.error.code, 'TRIAL_DIAGNOSIS_DISABLED')
+  } finally { await api.close() }
+})

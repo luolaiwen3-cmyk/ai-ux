@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import AnalystLayout from '../../components/shared/AnalystLayout.jsx'
-import { api } from '../../lib/apiClient.js'
+import { api, saveParticipantSession } from '../../lib/apiClient.js'
 
 const DEFAULT_STEPS = ['确认页面内容', '完成指定操作', '点击完成测试']
 const statusLabels = { active: '进行中', draft: '草稿', paused: '已暂停' }
@@ -11,6 +12,7 @@ const initialTask = () => ({
 })
 
 export default function TaskManagePage() {
+  const navigate = useNavigate()
   const [tasks, setTasks] = useState([])
   const [publicAppUrl, setPublicAppUrl] = useState(window.location.origin)
   const [showCreate, setShowCreate] = useState(false)
@@ -81,6 +83,17 @@ export default function TaskManagePage() {
     setError('')
     try { replaceTask((await api.tasks.update(task.id, { status })).task) }
     catch (requestError) { setError(requestError.message) }
+  }
+
+  const startTrial = async (task) => {
+    setSaving(true)
+    setError('')
+    try {
+      const result = await api.tasks.createTrial(task.id)
+      saveParticipantSession(result.session)
+      navigate(`/calibrate/${result.session.id}`, { state: { trial: true } })
+    } catch (requestError) { setError(requestError.message) }
+    finally { setSaving(false) }
   }
 
   const uploadReplacement = async (task, file) => {
@@ -161,6 +174,7 @@ export default function TaskManagePage() {
                   <div className="flex flex-wrap justify-end items-center gap-2 shrink-0 max-w-md">
                     <div className="text-right mr-2"><div className="text-[14px] font-semibold font-mono text-cyan-glow">{task.sessionCount}</div><div className="text-[9px] text-slate-500">正式会话</div></div>
                     {task.targetStatus === 'ready' && task.targetType !== 'builtin' && <button onClick={() => window.open(targetUrl(task), '_blank', 'noopener,noreferrer')} className="task-action">预览</button>}
+                    {task.targetStatus === 'ready' && <button onClick={() => startTrial(task)} disabled={saving} className="task-action disabled:opacity-40">试跑</button>}
                     {task.targetType === 'url' && <button onClick={() => setValidatingId(validatingId === task.id ? '' : task.id)} className="task-action">{task.targetStatus === 'ready' ? '重新验证' : '接入并验证'}</button>}
                     {task.targetType === 'upload' && <label className="task-action cursor-pointer">替换 ZIP<input type="file" accept=".zip,application/zip" className="hidden" onChange={(event) => uploadReplacement(task, event.target.files?.[0])} /></label>}
                     <button onClick={() => beginEdit(task)} className="task-action">编辑</button>

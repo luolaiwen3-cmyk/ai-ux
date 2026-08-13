@@ -150,12 +150,12 @@ export default function TaskPage() {
       deleteSession(sessionId)
       deleteFaceSession(sessionId)
       clearParticipantSession(sessionId)
-      navigate('/thanks', { replace: true })
+      navigate(session?.mode === 'trial' ? `/sessions/${sessionId}` : '/thanks', { replace: true })
     } catch (error) {
       setSubmitError(`${error.message}。录制数据已暂存在本机，请重试提交。`)
       setSubmitting(false)
     }
-  }, [sessionId, navigate])
+  }, [sessionId, navigate, session?.mode])
 
   // 任务完成 —— 只有点击"提交订单"才停止录制 → 保存后进入感谢页
   const handleTaskComplete = useCallback(async ({ selectedCount, couponApplied }) => {

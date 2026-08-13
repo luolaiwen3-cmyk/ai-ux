@@ -13,6 +13,7 @@ const statusLabels = {
 export default function SessionListPage() {
   const [filter, setFilter] = useState('all')
   const [sort, setSort] = useState('desc')
+  const [scope, setScope] = useState('participant')
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -21,14 +22,14 @@ export default function SessionListPage() {
     setLoading(true)
     setError('')
     try {
-      const result = await api.sessions.list({ sort })
+      const result = await api.sessions.list({ sort, scope })
       setSessions(result.sessions)
     } catch (requestError) {
       setError(requestError.message)
     } finally {
       setLoading(false)
     }
-  }, [sort])
+  }, [sort, scope])
 
   useEffect(() => {
     loadSessions()
@@ -47,7 +48,7 @@ export default function SessionListPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-lg font-semibold text-slate-100">会话列表</h1>
-            <p className="text-xs text-slate-500 mt-0.5">共 {sessions.length} 个会话 · {sessions.filter((item) => item.status === 'completed').length} 个已完成</p>
+            <p className="text-xs text-slate-500 mt-0.5">{scope === 'trial' ? '试跑验收' : '正式测试'} · 共 {sessions.length} 个会话 · {sessions.filter((item) => item.status === 'completed').length} 个已完成</p>
           </div>
           <div className="flex items-center gap-2">
             <select aria-label="会话排序" value={sort} onChange={(event) => setSort(event.target.value)} className="px-3 py-2 rounded-lg border border-slate-200 text-xs">
@@ -61,6 +62,9 @@ export default function SessionListPage() {
         {error && <div role="alert" className="mb-4 px-4 py-3 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700">{error}</div>}
 
         <div className="flex items-center gap-2 mb-4 overflow-x-auto">
+          <button onClick={() => { setScope('participant'); setFilter('all') }} className={`px-3 py-1.5 rounded-lg text-[11px] ${scope === 'participant' ? 'bg-cyan-glow/15 text-cyan-glow border border-cyan-glow/25' : 'text-slate-500 border border-transparent'}`}>正式会话</button>
+          <button onClick={() => { setScope('trial'); setFilter('all') }} className={`px-3 py-1.5 rounded-lg text-[11px] ${scope === 'trial' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/25' : 'text-slate-500 border border-transparent'}`}>试跑会话</button>
+          <div className="w-px h-5 bg-slate-700 mx-1" />
           {[
             ['all', '全部'],
             ['completed', '已完成'],
@@ -84,7 +88,7 @@ export default function SessionListPage() {
                 <div className="flex items-center gap-4">
                   <div className={`px-2 py-1 rounded text-[10px] font-mono font-semibold border shrink-0 ${session.severity === 'P0' ? 'bg-danger/15 text-danger border-danger/30' : session.severity === 'P1' ? 'bg-warn/15 text-warn border-warn/30' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>{session.severity || '—'}</div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2"><span className="text-[12px] font-medium text-slate-100 group-hover:text-cyan-glow">{session.participantCode}</span><span className="text-[10px] text-slate-500">{session.taskName}</span>{session.hasFace && <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">FACE</span>}</div>
+                    <div className="flex items-center gap-2"><span className="text-[12px] font-medium text-slate-100 group-hover:text-cyan-glow">{session.participantCode}</span><span className="text-[10px] text-slate-500">{session.taskName}</span>{session.mode === 'trial' && <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-amber-500/15 text-amber-400 border border-amber-500/20">TRIAL</span>}{session.hasFace && <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">FACE</span>}</div>
                     <div className="text-[10px] text-slate-500 mt-0.5 font-mono">{session.id}</div>
                   </div>
                   <div className="hidden md:flex items-center gap-4 shrink-0 text-[10px] font-mono text-slate-500">

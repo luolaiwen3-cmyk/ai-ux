@@ -126,7 +126,7 @@ export default function SessionDetailPage() {
             </Link>
             <div>
               <h1 className="text-[14px] font-semibold text-slate-100">
-                会话 {session.participantCode}
+                会话 {session.participantCode} {session.mode === 'trial' && <span className="ml-2 text-amber-400">· 试跑</span>}
               </h1>
               <p className="text-[10px] text-slate-500 font-mono">
                 {session.taskName} · {session.id}
@@ -139,12 +139,12 @@ export default function SessionDetailPage() {
                 rrweb 真实录制
               </span>
             )}
-            <Link
+            {session.mode !== 'trial' && <Link
               to={`/report/${id}`}
               className="px-3 py-1.5 rounded-lg bg-cyan-glow/15 border border-cyan-glow/25 text-[11px] font-mono text-cyan-glow hover:bg-cyan-glow/25 transition-colors"
             >
               📄 查看报告
-            </Link>
+            </Link>}
           </div>
         </div>
 
@@ -180,11 +180,11 @@ export default function SessionDetailPage() {
             <BehaviorCards stats={displayMetrics} meta={{ id: session.participantCode, task: session.taskName }} />
             {hasFace && <FaceDataCard frames={faceFrames} currentTime={currentTime} />}
             <StressChart data={realStressData} currentTime={currentTime} duration={duration} />
-            <DiagnosisPanel
+            {session.mode !== 'trial' ? <DiagnosisPanel
               sessionId={session.id}
               initialDiagnosis={session.diagnosis}
               onDiagnosed={(diagnosis) => setSession((current) => ({ ...current, diagnosis }))}
-            />
+            /> : <div className="glass rounded-xl p-4 text-xs text-amber-400">试跑会话仅用于检查网页和录制回放，不生成诊断、报告或分享链接。</div>}
           </div>
         </div>
       </div>
