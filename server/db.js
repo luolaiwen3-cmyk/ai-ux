@@ -22,7 +22,14 @@ const mapTask = (row) => row && ({
   token: row.token,
   name: row.name,
   description: row.description,
-  scenario: row.scenario,
+  scenario: row.target_type === 'builtin' ? row.scenario : 'generic-web',
+  targetType: row.target_type || 'builtin',
+  targetStatus: row.target_status || 'ready',
+  targetUrl: row.target_url || null,
+  targetOrigin: row.target_origin || null,
+  contentToken: row.content_token || null,
+  contentRevision: row.content_revision || null,
+  validatedAt: row.validated_at || null,
   steps: parseJson(row.steps_json, []),
   status: row.status,
   sessionCount: Number(row.session_count || 0),
@@ -35,6 +42,7 @@ const mapSessionSummary = (row) => row && ({
   taskId: row.task_id,
   taskName: row.task_name,
   participantCode: row.participant_code,
+  mode: row.mode || 'participant',
   status: row.status,
   couponDecision: row.coupon_decision,
   duration: Number(row.duration_ms || 0),
@@ -67,6 +75,13 @@ export function createStore(databasePath) {
       name TEXT NOT NULL,
       description TEXT NOT NULL DEFAULT '',
       scenario TEXT NOT NULL CHECK (scenario IN ('checkout-coupon')),
+      target_type TEXT NOT NULL DEFAULT 'builtin' CHECK (target_type IN ('builtin', 'upload', 'url')),
+      target_status TEXT NOT NULL DEFAULT 'ready' CHECK (target_status IN ('pending', 'ready', 'invalid')),
+      target_url TEXT,
+      target_origin TEXT,
+      content_token TEXT,
+      content_revision TEXT,
+      validated_at TEXT,
       steps_json TEXT NOT NULL DEFAULT '[]',
       status TEXT NOT NULL CHECK (status IN ('draft', 'active', 'paused')),
       created_at TEXT NOT NULL,
@@ -77,6 +92,7 @@ export function createStore(databasePath) {
       task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
       participant_code TEXT NOT NULL,
       upload_token_hash TEXT NOT NULL,
+      mode TEXT NOT NULL DEFAULT 'participant' CHECK (mode IN ('participant', 'trial')),
       status TEXT NOT NULL CHECK (status IN ('created', 'recording', 'completed', 'abandoned')),
       consent_at TEXT NOT NULL,
       started_at TEXT,
@@ -85,6 +101,7 @@ export function createStore(databasePath) {
       rrweb_events_json TEXT,
       face_frames_json TEXT,
       metrics_json TEXT,
+      result_json TEXT,
       duration_ms INTEGER NOT NULL DEFAULT 0,
       event_count INTEGER NOT NULL DEFAULT 0,
       frame_count INTEGER NOT NULL DEFAULT 0,
@@ -116,14 +133,39 @@ export function createStore(databasePath) {
     throw error
   }
 
+  const ensureColumn = (table, column, definition) => {
+    const columns = database.prepare(`PRAGMA table_info(${table})`).all()
+    if (!columns.some((item) => item.name === column)) {
+      database.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`)
+    }
+  }
+
+  ensureColumn('tasks', 'target_type', "TEXT NOT NULL DEFAULT 'builtin' CHECK (target_type IN ('builtin', 'upload', 'url'))")
+  ensureColumn('tasks', 'target_status', "TEXT NOT NULL DEFAULT 'ready' CHECK (target_status IN ('pending', 'ready', 'invalid'))")
+  ensureColumn('tasks', 'target_url', 'TEXT')
+  ensureColumn('tasks', 'target_origin', 'TEXT')
+  ensureColumn('tasks', 'content_token', 'TEXT')
+  ensureColumn('tasks', 'content_revision', 'TEXT')
+  ensureColumn('tasks', 'validated_at', 'TEXT')
+  ensureColumn('sessions', 'mode', "TEXT NOT NULL DEFAULT 'participant' CHECK (mode IN ('participant', 'trial'))")
+  ensureColumn('sessions', 'result_json', 'TEXT')
+
   const taskSelect = `
     SELECT tasks.*,
-      (SELECT COUNT(*) FROM sessions WHERE sessions.task_id = tasks.id) AS session_count
+      (SELECT COUNT(*) FROM sessions WHERE sessions.task_id = tasks.id AND sessions.mode = 'participant') AS session_count
     FROM tasks
   `
 
   const sessionSelect = `
     SELECT sessions.*, tasks.name AS task_name,
+      tasks.target_type AS task_target_type,
+      tasks.target_status AS task_target_status,
+      tasks.target_url AS task_target_url,
+      tasks.target_origin AS task_target_origin,
+      tasks.content_token AS task_content_token,
+      tasks.content_revision AS task_content_revision,
+      tasks.scenario AS task_scenario,
+      tasks.steps_json AS task_steps_json,
       diagnoses.status AS diagnosis_status,
       json_extract(diagnoses.result_json, '$.severity') AS severity
     FROM sessions
@@ -146,13 +188,15 @@ export function createStore(databasePath) {
         name: '电商结算页优惠券测试',
         description: '请像日常购物一样检查商品、处理优惠券并提交订单。',
         scenario: 'checkout-coupon',
+        targetType: 'builtin',
+        targetStatus: 'ready',
         steps: ['确认购物车商品', '处理优惠券提示', '提交订单'],
         status: 'active'
       }
       database.prepare(`
-        INSERT INTO tasks (id, token, name, description, scenario, steps_json, status, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(task.id, task.token, task.name, task.description, task.scenario, JSON.stringify(task.steps), task.status, timestamp, timestamp)
+        INSERT INTO tasks (id, token, name, description, scenario, target_type, target_status, validated_at, steps_json, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(task.id, task.token, task.name, task.description, task.scenario, task.targetType, task.targetStatus, timestamp, JSON.stringify(task.steps), task.status, timestamp, timestamp)
       return task
     },
 
@@ -176,13 +220,19 @@ export function createStore(databasePath) {
         name: input.name,
         description: input.description || '',
         scenario: 'checkout-coupon',
+        targetType: input.targetType || 'builtin',
+        targetStatus: (input.targetType || 'builtin') === 'builtin' ? 'ready' : 'pending',
+        targetUrl: input.targetUrl || null,
         steps: input.steps,
         status: input.status || 'draft'
       }
+      if (task.status === 'active' && task.targetStatus !== 'ready') {
+        throw new HttpError(409, '测试网页验证通过后才能发布', 'TARGET_NOT_READY')
+      }
       database.prepare(`
-        INSERT INTO tasks (id, token, name, description, scenario, steps_json, status, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(task.id, task.token, task.name, task.description, task.scenario, JSON.stringify(task.steps), task.status, timestamp, timestamp)
+        INSERT INTO tasks (id, token, name, description, scenario, target_type, target_status, target_url, validated_at, steps_json, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(task.id, task.token, task.name, task.description, task.scenario, task.targetType, task.targetStatus, task.targetUrl, task.targetStatus === 'ready' ? timestamp : null, JSON.stringify(task.steps), task.status, timestamp, timestamp)
       return store.getTask(task.id)
     },
 
@@ -193,33 +243,53 @@ export function createStore(databasePath) {
         name: input.name ?? current.name,
         description: input.description ?? current.description,
         steps: input.steps ?? current.steps,
-        status: input.status ?? current.status
+        status: input.status ?? current.status,
+        targetUrl: input.targetUrl ?? current.targetUrl,
+        targetStatus: input.targetStatus ?? current.targetStatus,
+        targetOrigin: input.targetOrigin ?? current.targetOrigin,
+        contentToken: input.contentToken ?? current.contentToken,
+        contentRevision: input.contentRevision ?? current.contentRevision,
+        validatedAt: input.validatedAt ?? current.validatedAt
+      }
+      if (input.targetUrl !== undefined && input.targetUrl !== current.targetUrl) {
+        next.targetStatus = 'pending'
+        next.targetOrigin = null
+        next.validatedAt = null
+        if (next.status === 'active') next.status = 'draft'
+      }
+      if (next.status === 'active' && next.targetStatus !== 'ready') {
+        throw new HttpError(409, '测试网页验证通过后才能发布', 'TARGET_NOT_READY')
       }
       database.prepare(`
-        UPDATE tasks SET name = ?, description = ?, steps_json = ?, status = ?, updated_at = ?
+        UPDATE tasks SET name = ?, description = ?, steps_json = ?, status = ?, target_url = ?,
+          target_status = ?, target_origin = ?, content_token = ?, content_revision = ?, validated_at = ?, updated_at = ?
         WHERE id = ?
-      `).run(next.name, next.description, JSON.stringify(next.steps), next.status, nowIso(), id)
+      `).run(next.name, next.description, JSON.stringify(next.steps), next.status, next.targetUrl,
+        next.targetStatus, next.targetOrigin, next.contentToken, next.contentRevision, next.validatedAt, nowIso(), id)
       return store.getTask(id)
     },
 
-    createSession(taskId) {
+    createSession(taskId, { mode = 'participant', allowInactive = false } = {}) {
       const task = store.getTask(taskId)
-      if (!task || task.status !== 'active') {
+      if (!task || (!allowInactive && task.status !== 'active')) {
         throw new HttpError(409, '任务当前不可参与', 'TASK_NOT_ACTIVE')
       }
-      const sequence = Number(database.prepare('SELECT COUNT(*) AS count FROM sessions WHERE task_id = ?').get(taskId).count) + 1
+      if (task.targetStatus !== 'ready') {
+        throw new HttpError(409, '测试网页尚未验证', 'TARGET_NOT_READY')
+      }
+      const sequence = Number(database.prepare('SELECT COUNT(*) AS count FROM sessions WHERE task_id = ? AND mode = ?').get(taskId, mode).count) + 1
       const uploadToken = createOpaqueToken(24)
       const timestamp = nowIso()
       const session = {
         id: randomUUID(),
-        participantCode: `P-${String(sequence).padStart(3, '0')}`,
+        participantCode: `${mode === 'trial' ? 'T' : 'P'}-${String(sequence).padStart(3, '0')}`,
         uploadToken
       }
       database.prepare(`
         INSERT INTO sessions (
-          id, task_id, participant_code, upload_token_hash, status, consent_at, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, 'created', ?, ?, ?)
-      `).run(session.id, taskId, session.participantCode, hashToken(uploadToken), timestamp, timestamp, timestamp)
+          id, task_id, participant_code, upload_token_hash, mode, status, consent_at, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, 'created', ?, ?, ?)
+      `).run(session.id, taskId, session.participantCode, hashToken(uploadToken), mode, timestamp, timestamp, timestamp)
       return session
     },
 
@@ -236,7 +306,19 @@ export function createStore(databasePath) {
       const row = database.prepare(`${sessionSelect} WHERE sessions.id = ?`).get(id)
       if (!row) return null
       const summary = mapSessionSummary(row)
-      return { ...summary, scenario: 'checkout-coupon' }
+      return {
+        ...summary,
+        scenario: row.task_target_type === 'builtin' ? row.task_scenario : 'generic-web',
+        steps: parseJson(row.task_steps_json, []),
+        target: {
+          type: row.task_target_type,
+          status: row.task_target_status,
+          url: row.task_target_url,
+          origin: row.task_target_origin,
+          contentToken: row.task_content_token,
+          revision: row.task_content_revision
+        }
+      }
     },
 
     startSession(id) {
@@ -266,7 +348,7 @@ export function createStore(databasePath) {
       database.prepare(`
         UPDATE sessions SET
           status = 'completed', completed_at = ?, coupon_decision = ?,
-          rrweb_events_json = ?, face_frames_json = ?, metrics_json = ?,
+          rrweb_events_json = ?, face_frames_json = ?, metrics_json = ?, result_json = ?,
           duration_ms = ?, event_count = ?, frame_count = ?, last_emotion_json = ?, updated_at = ?
         WHERE id = ?
       `).run(
@@ -275,6 +357,7 @@ export function createStore(databasePath) {
         JSON.stringify(events),
         JSON.stringify(frames),
         JSON.stringify({ ...metrics, taskResult: input.metrics || {} }),
+        JSON.stringify(input.result || {}),
         metrics.totalDurationMs || Math.max(0, Math.round(Number(input.duration) || 0)),
         events.length,
         frames.length,
@@ -297,12 +380,16 @@ export function createStore(databasePath) {
       return true
     },
 
-    listSessions({ status, sort = 'desc' } = {}) {
+    listSessions({ status, sort = 'desc', scope = 'participant' } = {}) {
       const conditions = []
       const parameters = []
       if (status) {
         conditions.push('sessions.status = ?')
         parameters.push(status)
+      }
+      if (scope !== 'all') {
+        conditions.push('sessions.mode = ?')
+        parameters.push(scope === 'trial' ? 'trial' : 'participant')
       }
       const where = conditions.length ? ` WHERE ${conditions.join(' AND ')}` : ''
       const direction = sort === 'asc' ? 'ASC' : 'DESC'
@@ -318,6 +405,7 @@ export function createStore(databasePath) {
         events: parseJson(row.rrweb_events_json, []),
         faceFrames: parseJson(row.face_frames_json, []),
         metrics: parseJson(row.metrics_json, {}),
+        result: parseJson(row.result_json, {}),
         diagnosis
       }
     },

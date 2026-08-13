@@ -8,6 +8,7 @@ import { HttpError, readJson, requireText, sendJson } from './http.js'
 import { diagnoseSession } from './diagnosis.js'
 
 const TASK_STATUSES = new Set(['draft', 'active', 'paused'])
+const TASK_TARGET_TYPES = new Set(['builtin', 'upload', 'url'])
 const SESSION_STATUSES = new Set(['created', 'recording', 'completed', 'abandoned'])
 const COUPON_DECISIONS = new Set(['none', 'applied', 'declined'])
 
@@ -25,6 +26,26 @@ const taskInput = (body, partial = false) => {
     result.description = typeof body.description === 'string' ? body.description.trim().slice(0, 1000) : ''
   }
   if (!partial || body.steps !== undefined) result.steps = validateSteps(body.steps)
+  if (!partial || body.targetType !== undefined) {
+    const targetType = body.targetType || 'builtin'
+    if (!TASK_TARGET_TYPES.has(targetType)) throw new HttpError(400, '测试网页类型无效', 'VALIDATION_ERROR')
+    result.targetType = targetType
+  }
+  if (body.targetUrl !== undefined) {
+    if (typeof body.targetUrl !== 'string' || body.targetUrl.length > 2000) {
+      throw new HttpError(400, '测试网页 URL 无效', 'VALIDATION_ERROR')
+    }
+    try {
+      const parsed = new URL(body.targetUrl)
+      if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('protocol')
+      result.targetUrl = parsed.toString()
+    } catch {
+      throw new HttpError(400, '测试网页 URL 必须是有效的 HTTP(S) 地址', 'VALIDATION_ERROR')
+    }
+  }
+  if (!partial && result.targetType === 'url' && !result.targetUrl) {
+    throw new HttpError(400, 'URL 类型任务必须填写测试网页地址', 'VALIDATION_ERROR')
+  }
   if (body.status !== undefined) {
     if (!TASK_STATUSES.has(body.status)) throw new HttpError(400, '任务状态无效', 'VALIDATION_ERROR')
     result.status = body.status

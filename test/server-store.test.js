@@ -1,4 +1,8 @@
 import assert from 'node:assert/strict'
+import { DatabaseSync } from 'node:sqlite'
+import { mkdtempSync } from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import test from 'node:test'
 import { createStore } from '../server/db.js'
 
@@ -73,6 +77,72 @@ test('暂停任务不能创建新会话，退出会话会清除采集数据', ()
     store.updateTask(task.id, { status: 'paused' })
     assert.throws(() => store.createSession(task.id), /不可参与/)
     assert.equal(store.getPublicTask(task.token), undefined)
+  } finally {
+    store.close()
+  }
+})
+
+test('自定义网页任务验证前不能发布，试跑会话使用独立编号', () => {
+  const store = createStore(':memory:')
+  try {
+    assert.throws(() => store.createTask({
+      name: '上传网页任务', description: '', steps: ['完成页面操作'],
+      targetType: 'upload', status: 'active'
+    }), /验证通过/)
+
+    const task = store.createTask({
+      name: '上传网页任务', description: '', steps: ['完成页面操作'],
+      targetType: 'upload', status: 'draft'
+    })
+    assert.equal(task.targetStatus, 'pending')
+    const ready = store.updateTask(task.id, {
+      targetStatus: 'ready', contentToken: 'content-token', contentRevision: 'r1', validatedAt: new Date().toISOString()
+    })
+    assert.equal(store.updateTask(task.id, { status: 'active' }).status, 'active')
+    const trial = store.createSession(ready.id, { mode: 'trial', allowInactive: true })
+    assert.equal(trial.participantCode, 'T-001')
+    assert.equal(store.listSessions().length, 0)
+    assert.equal(store.listSessions({ scope: 'trial' }).length, 1)
+  } finally {
+    store.close()
+  }
+})
+
+test('旧版数据库会自动补齐自定义任务和试跑字段', () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'insightux-migration-'))
+  const databasePath = path.join(directory, 'legacy.db')
+  const legacy = new DatabaseSync(databasePath)
+  legacy.exec(`
+    CREATE TABLE tasks (
+      id TEXT PRIMARY KEY, token TEXT NOT NULL UNIQUE, name TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '', scenario TEXT NOT NULL,
+      steps_json TEXT NOT NULL DEFAULT '[]', status TEXT NOT NULL,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE TABLE sessions (
+      id TEXT PRIMARY KEY, task_id TEXT NOT NULL, participant_code TEXT NOT NULL,
+      upload_token_hash TEXT NOT NULL, status TEXT NOT NULL, consent_at TEXT NOT NULL,
+      started_at TEXT, completed_at TEXT, coupon_decision TEXT NOT NULL DEFAULT 'none',
+      rrweb_events_json TEXT, face_frames_json TEXT, metrics_json TEXT,
+      duration_ms INTEGER NOT NULL DEFAULT 0, event_count INTEGER NOT NULL DEFAULT 0,
+      frame_count INTEGER NOT NULL DEFAULT 0, last_emotion_json TEXT,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE TABLE diagnoses (
+      id TEXT PRIMARY KEY, session_id TEXT NOT NULL UNIQUE, status TEXT NOT NULL,
+      provider TEXT NOT NULL, model TEXT NOT NULL, result_json TEXT, fallback_reason TEXT,
+      share_token TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+  `)
+  legacy.prepare("INSERT INTO tasks VALUES ('t1','legacy','Legacy','', 'checkout-coupon','[\"done\"]','active',?,?)")
+    .run(new Date().toISOString(), new Date().toISOString())
+  legacy.close()
+
+  const store = createStore(databasePath)
+  try {
+    const task = store.getTask('t1')
+    assert.equal(task.targetType, 'builtin')
+    assert.equal(task.targetStatus, 'ready')
   } finally {
     store.close()
   }
