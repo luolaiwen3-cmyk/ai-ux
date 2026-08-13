@@ -1,149 +1,106 @@
 # InsightUX
 
-AI 驱动的 UX 智能诊断平台。仓库采用前后端并列结构：
+InsightUX 是一个本机运行的 UX 行为录制与诊断平台。参与者端记录 rrweb 行为和 MediaPipe 派生面部特征，分析端从 FastAPI + SQLite 后端读取会话、回放与报告。
 
-- `frontend/`：React + Vite 用户端与分析工作台
-- `backend/`：FastAPI + SQLite 本地服务
-- `docs/`：系统设计文档
-- `scripts/`：开发与运维脚本
-- `data/`：本地运行数据（不进入 Git）
+## 架构
 
-## 当前前端运行
-
-```bash
-cd frontend
-npm install
-npm run dev
+```text
+frontend/   React + Vite
+backend/    FastAPI + SQLAlchemy + Alembic
+data/       SQLite、压缩录制文件与备份（Git 忽略）
+docs/       系统说明
+scripts/    开发和检查脚本
 ```
 
-## Demo 演示流程建议
+SQLite 只保存任务、会话、批次索引和报告。体积较大的 rrweb 与面部特征批次存为 `data/sessions/{session_id}/{stream}/*.json.gz`。系统不会保存原始视频、音频或面部截图。
 
-场景一：展示测试人员视角（2 分钟）
+## 首次安装
 
-打开 http://localhost:5173/#/join/abc123
+```bash
+cd backend
+UV_CACHE_DIR=../.uv-cache uv sync --dev
 
-点击「我已了解，继续」→ 进入知情同意
+cd ../frontend
+npm install
+```
 
-点击「同意并开始」→ 设备检测（浏览器会请求摄像头权限，允许即可）
+复制 `.env.example` 为 `.env`。开发环境默认管理员：
 
-检测通过 → 点击「开始测试」
+- 用户名：`admin`
+- 密码：`admin123`
 
-进入结算页，像真实用户一样操作：勾选商品、看订单摘要
+正式使用前必须替换管理员密码哈希和 `INSIGHTUX_SESSION_SECRET`。生成密码哈希：
 
-3.5s 后优惠券弹窗自动出现
+```bash
+cd backend
+UV_CACHE_DIR=../.uv-cache uv run python -c "from argon2 import PasswordHasher; print(PasswordHasher().hash('你的密码'))"
+```
 
-点击「立即使用」→ 弹窗关闭，摘要显示优惠抵扣
+## 开发运行
 
-场景二：展示分析人员视角（3 分钟）
+```bash
+chmod +x scripts/dev.sh scripts/check.sh
+./scripts/dev.sh
+```
 
-打开 http://localhost:5173/#/（仪表盘）
+- 前端：http://127.0.0.1:5173
+- API 文档：http://127.0.0.1:8000/docs
+- 分析端登录：http://127.0.0.1:5173/#/login
 
-切到「Admin 全局视图」看趋势图表
+Vite 会把 `/api` 代理到 FastAPI。后端启动时自动执行 Alembic 迁移。
 
-进入 /#/tasks 展示任务管理
+## 生产运行（本机）
 
-进入 /#/sessions 看会话列表
+```bash
+cd frontend && npm run build
+cd ../backend
+UV_CACHE_DIR=../.uv-cache uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
+```
 
-点进一个会话 /#/sessions/UX-0812-0037
+访问 http://127.0.0.1:8000。只使用一个 Uvicorn worker，且不要将 SQLite 数据目录放在网络文件系统。
 
-点击播放 → 展示鼠标轨迹回放 + 点击涟漪 + 弹窗同步显隐
+## 数据流程
 
-拖拽时间轴到 14.5s → 展示 Peak 峰值
+1. 管理员登录后创建任务并复制测试链接。
+2. 参与者同意后，后端创建唯一会话。
+3. rrweb 和面部特征先写入 IndexedDB 队列，再按幂等批次上传。
+4. 后端原子写入 gzip 文件并在 SQLite 记录索引。
+5. 测试结束后确认会话完成；失败批次可在感谢页重试。
+6. 分析端读取真实会话、回放数据并持久化模板诊断报告。
 
-点击「触发 Qwen3-VL 智能诊断」→ 等 2.4s → 完整报告出现
+## 旧数据导入
 
-点击「查看报告」→ 进入报告导出页
+会话列表会检测旧版 `localStorage` 录制并显示导入入口。导入成功后，由管理员决定是否清理浏览器副本。重复导入不会创建重复会话。
 
-📁 前端结构总览
+## 备份与恢复
 
-frontend/
+分析端侧栏可下载完整备份。命令行备份：
 
-├── package.json
+```bash
+cd backend
+UV_CACHE_DIR=../.uv-cache uv run python -m app.cli backup
+```
 
-├── vite.config.js
+恢复前停止后端：
 
-├── tailwind.config.js
+```bash
+cd backend
+UV_CACHE_DIR=../.uv-cache uv run python -m app.cli restore ../data/backups/insightux-backup-xxx.tar.gz
+```
 
-├── index.html
+恢复前会自动备份当前数据。备份包含一致性 SQLite 快照与全部会话文件。
 
-└── src/
+## 验证
 
-  ├── main.jsx         ← 入口（HashRouter）
+```bash
+./scripts/check.sh
+```
 
-  ├── App.jsx          ← 路由配置
+该命令运行后端测试、数据库迁移和前端生产构建。
 
-  ├── index.css         ← 全局样式
+## 当前限制
 
-  ├── data/
-
-  │  └── sessionData.js    ← 模拟会话数据
-
-  ├── pages/
-
-  │  ├── participant/     ← 测试人员端页面
-
-  │  │  ├── EntryPage.jsx   P1
-
-  │  │  ├── CalibratePage.jsx P2
-
-  │  │  └── TaskPage.jsx   P3
-
-  │  └── analyst/       ← 分析人员端页面
-
-  │    ├── DashboardPage.jsx  A5
-
-  │    ├── TaskManagePage.jsx A1
-
-  │    ├── SessionListPage.jsx A2
-
-  │    ├── SessionDetailPage.jsx A3
-
-  │    └── ReportPage.jsx   A4
-
-  └── components/
-
-​    ├── participant/     ← 测试人员 UI 组件
-
-​    │  ├── CheckoutPage.jsx
-
-​    │  ├── ProductList.jsx
-
-​    │  ├── OrderSummary.jsx
-
-​    │  └── CouponPopup.jsx
-
-​    ├── researcher/      ← 分析回放组件
-
-​    │  ├── ReplayViewport.jsx
-
-​    │  ├── FaceMesh.jsx
-
-​    │  ├── Timeline.jsx
-
-​    │  ├── BehaviorCards.jsx
-
-​    │  ├── StressChart.jsx
-
-​    │  └── DiagnosisPanel.jsx
-
-​    └── shared/
-
-​      └── AnalystLayout.jsx  ← 分析端共享布局
-
-
-
-master（生产环境，稳定版本）
-  │
-  └── develop（开发集成分支）
-        │
-        ├── feature/测试人员
-        │     ├── feat/P1-入口页 git分支 feat/P1-pageOfindex
-        │     ├── feat/P2-校准页
-        │     └── feat/P3-测试任务页
-        │
-        └── feature/UX分析人员
-              ├── feat/A1-任务管理
-              ├── feat/A2-会话列表
-              ├── feat/A3-单会话深度分析
-              ├── feat/A4-报告导出
-              └── feat/A5-仪表盘
+- 第一阶段仅支持本机，不开放局域网或公网访问。
+- 仅有单一管理员，不包含多用户和角色权限。
+- 诊断报告使用本地模板持久化，暂未调用真实 Qwen API。
+- 已完成数据默认保留，管理员可手动删除；未完成会话超过 24 小时会自动清理。

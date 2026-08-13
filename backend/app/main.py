@@ -3,6 +3,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from alembic import command
+from alembic.config import Config
 
 from app.api.health import router as health_router
 from app.api.auth import router as auth_router
@@ -11,7 +13,7 @@ from app.api.sessions import router as participant_sessions_router
 from app.api.analyst_sessions import router as analyst_sessions_router
 from app.api.reports import router as reports_router
 from app.api.admin import router as admin_router
-from app.core.config import get_settings
+from app.core.config import REPO_ROOT, get_settings
 
 
 @asynccontextmanager
@@ -20,6 +22,8 @@ async def lifespan(_app: FastAPI):
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     (settings.data_dir / "sessions").mkdir(exist_ok=True)
     (settings.data_dir / "backups").mkdir(exist_ok=True)
+    alembic_config = Config(str(REPO_ROOT / "backend" / "alembic.ini"))
+    command.upgrade(alembic_config, "head")
     yield
 
 
