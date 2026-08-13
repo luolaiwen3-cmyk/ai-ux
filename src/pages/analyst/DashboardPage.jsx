@@ -12,7 +12,7 @@ import {
   BarChart,
   Bar
 } from 'recharts'
-import { getDashboardStats, getRecentSessions } from '../../lib/sessionDataService.js'
+import { api } from '../../lib/apiClient.js'
 
 /**
  * A5 仪表盘 —— 分析人员首页
@@ -24,20 +24,21 @@ export default function DashboardPage() {
   const [view, setView] = useState('normal') // normal | admin
   const [stats, setStats] = useState(null)
   const [recentSessions, setRecentSessions] = useState([])
+  const [error, setError] = useState('')
 
   // 加载真实数据
   useEffect(() => {
-    const s = getDashboardStats()
-    setStats(s)
-
-    const recent = getRecentSessions(5)
-    const formatted = recent.map((r, i) => ({
-      id: r.id,
-      participant: `P-${String(i + 1).padStart(3, '0')}`,
-      severity: r.hasFace && r.lastEmotion?.value > 0.7 ? 'P0' : 'P1',
-      time: new Date(r.savedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-    }))
-    setRecentSessions(formatted)
+    let active = true
+    api.dashboard.get()
+      .then(({ stats: nextStats }) => {
+        if (!active) return
+        setStats(nextStats)
+        setRecentSessions(nextStats.recentSessions)
+      })
+      .catch((requestError) => {
+        if (active) setError(requestError.message)
+      })
+    return () => { active = false }
   }, [])
 
   return (
@@ -72,6 +73,8 @@ export default function DashboardPage() {
             </button>
           </div>
         </div>
+
+        {error && <div role="alert" className="mb-4 px-4 py-3 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700">{error}</div>}
 
         {/* 核心指标 */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
@@ -113,8 +116,8 @@ export default function DashboardPage() {
                       {s.severity}
                     </span>
                     <span className="text-[11px] font-mono text-slate-300 flex-1">{s.id}</span>
-                    <span className="text-[10px] text-slate-500">{s.participant}</span>
-                    <span className="text-[10px] text-slate-500">{s.time}</span>
+                    <span className="text-[10px] text-slate-500">{s.participantCode}</span>
+                    <span className="text-[10px] text-slate-500">{new Date(s.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span>
                   </Link>
                 ))}
               </div>
@@ -176,7 +179,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="h-[180px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={issueDist} layout="vertical">
+                    <BarChart data={stats?.issueDist || []} layout="vertical">
                       <CartesianGrid stroke="#e5e7eb" strokeDasharray="3 3" />
                       <XAxis type="number" tick={{ fill: '#374151', fontSize: 10 }} stroke="#d1d5db" />
                       <YAxis dataKey="type" type="category" tick={{ fill: '#374151', fontSize: 10 }} stroke="#d1d5db" width={70} />
@@ -210,9 +213,9 @@ export default function DashboardPage() {
                 SYSTEM · 系统设置
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <SettingItem label="Qwen3-VL API" value="已配置" status="ok" />
-                <SettingItem label="MediaPipe 模型" value="face_mesh_v2" status="ok" />
-                <SettingItem label="数据存储" value="本地 / 2.3 GB" status="ok" />
+                <SettingItem label="分析引擎" value="确定性指标" status="ok" />
+                <SettingItem label="面部采集" value="MediaPipe" status="ok" />
+                <SettingItem label="数据存储" value="SQLite" status="ok" />
               </div>
             </div>
           </div>

@@ -82,6 +82,10 @@ export const api = {
     get: (id) => request(`/api/sessions/${encodeURIComponent(id)}`)
   },
 
+  dashboard: {
+    get: () => request('/api/dashboard')
+  },
+
   participant: {
     getTask: (token) => request(`/api/public/tasks/${encodeURIComponent(token)}`),
     createSession: (token) => request(`/api/public/tasks/${encodeURIComponent(token)}/sessions`, {
