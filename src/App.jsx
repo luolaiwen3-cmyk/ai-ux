@@ -9,6 +9,7 @@ const CalibratePage = lazy(() => import('./pages/participant/CalibratePage.jsx')
 const TaskPage = lazy(() => import('./pages/participant/TaskPage.jsx'))
 const ThanksPage = lazy(() => import('./pages/participant/ThanksPage.jsx'))
 const LoginPage = lazy(() => import('./pages/analyst/LoginPage.jsx'))
+const SharedReportPage = lazy(() => import('./pages/participant/SharedReportPage.jsx'))
 const DashboardPage = lazy(() => import('./pages/analyst/DashboardPage.jsx'))
 const TaskManagePage = lazy(() => import('./pages/analyst/TaskManagePage.jsx'))
 const SessionListPage = lazy(() => import('./pages/analyst/SessionListPage.jsx'))
@@ -35,6 +36,7 @@ export default function App() {
             <Route path="/calibrate/:sessionId" element={<CalibratePage />} />
             <Route path="/task/:sessionId" element={<TaskPage />} />
             <Route path="/thanks" element={<ThanksPage />} />
+            <Route path="/share/:token" element={<SharedReportPage />} />
 
             <Route path="/login" element={<LoginPage />} />
 

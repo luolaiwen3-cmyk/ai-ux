@@ -228,6 +228,18 @@ body {
   .form-control {
     @apply w-full px-3 py-2 rounded-lg bg-white border border-slate-300 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-500;
   }
+
+  .report-action {
+    @apply px-3 py-2 rounded-lg bg-white border border-slate-300 text-[11px] font-mono text-slate-700 hover:bg-slate-50;
+  }
+
+  .report-primary-action {
+    @apply px-4 py-2 rounded-lg bg-slate-950 text-white text-xs font-semibold hover:bg-slate-800;
+  }
+
+  .report-badge {
+    @apply px-2 py-0.5 rounded text-[10px] font-mono bg-slate-100 text-slate-600 border border-slate-200;
+  }
 }
 
 .analyst-theme .text-gradient {
