@@ -1,4 +1,22 @@
-Demo 演示流程建议
+# InsightUX
+
+AI 驱动的 UX 智能诊断平台。仓库采用前后端并列结构：
+
+- `frontend/`：React + Vite 用户端与分析工作台
+- `backend/`：FastAPI + SQLite 本地服务
+- `docs/`：系统设计文档
+- `scripts/`：开发与运维脚本
+- `data/`：本地运行数据（不进入 Git）
+
+## 当前前端运行
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+## Demo 演示流程建议
 
 场景一：展示测试人员视角（2 分钟）
 
@@ -36,11 +54,9 @@ Demo 演示流程建议
 
 点击「查看报告」→ 进入报告导出页
 
-📁 项目结构总览
+📁 前端结构总览
 
-ai-ux/
-
-├── SYSTEM_ANALYSIS.md      ← 系统分析文档（给评委看）
+frontend/
 
 ├── package.json
 
