@@ -19,19 +19,19 @@ async function login(page) {
 }
 
 async function taskByName(page, name) {
-  const response = await page.request.get('/api/tasks')
+  const response = await page.request.get('/api/v1/tasks')
   expect(response.ok()).toBeTruthy()
-  return (await response.json()).tasks.find((task) => task.name === name)
+  return (await response.json()).data.find((task) => task.name === name)
 }
 
 async function launchSession(page, task, mode = 'participant') {
   const response = mode === 'trial'
-    ? await page.request.post(`/api/tasks/${task.id}/trials`)
-    : await page.request.post(`/api/public/tasks/${task.token}/sessions`, { data: { consent: true } })
+    ? await page.request.post(`/api/v1/tasks/${task.id}/trials`)
+    : await page.request.post(`/api/v1/participant/tasks/${task.token}/sessions`, { data: { consent: true } })
   expect(response.ok()).toBeTruthy()
-  const session = (await response.json()).session
+  const session = (await response.json()).data
   await page.evaluate(({ id, token }) => sessionStorage.setItem(`insightux-session-token:${id}`, token), { id: session.id, token: session.uploadToken })
-  const started = await page.request.post(`/api/public/sessions/${session.id}/start`, { headers: { 'X-Session-Token': session.uploadToken } })
+  const started = await page.request.post(`/api/v1/participant/sessions/${session.id}/start`, { headers: { Authorization: `Bearer ${session.uploadToken}` } })
   expect(started.ok()).toBeTruthy()
   await page.goto(`/#/task/${session.id}`)
   await expect(page.locator('iframe')).toBeVisible()
@@ -62,7 +62,7 @@ test('上传 ZIP、发布、完成正式测试并回放，试跑不污染统计'
 
   await page.goto(`/#/sessions/${formal.id}`)
   await expect(page.getByText('rrweb 真实录制')).toBeVisible()
-  const before = await (await page.request.get('/api/dashboard')).json()
+  const before = await (await page.request.get('/api/v1/dashboard')).json()
 
   const trial = await launchSession(page, task, 'trial')
   await page.frameLocator('iframe').getByRole('button', { name: 'Try action' }).click()
@@ -70,19 +70,19 @@ test('上传 ZIP、发布、完成正式测试并回放，试跑不污染统计'
   await expect(page).toHaveURL(new RegExp(`#\/sessions\/${trial.id}$`))
   await expect(page.getByText(/· 试跑/)).toBeVisible()
   await expect(page.getByText('试跑会话仅用于检查网页和录制回放')).toBeVisible()
-  const after = await (await page.request.get('/api/dashboard')).json()
-  expect(after.stats.totalSessions).toBe(before.stats.totalSessions)
-  expect(after.stats.completedSessions).toBe(before.stats.completedSessions)
+  const after = await (await page.request.get('/api/v1/dashboard')).json()
+  expect(after.data.totalSessions).toBe(before.data.totalSessions)
+  expect(after.data.completedSessions).toBe(before.data.completedSessions)
 })
 
 test('URL 页面通过真实 SDK 握手验证，无 SDK 页面不能发布', async ({ page }) => {
   await login(page)
-  const createResponse = await page.request.post('/api/tasks', { data: {
+  const createResponse = await page.request.post('/api/v1/tasks', { data: {
     name: 'E2E URL 任务', description: '', steps: ['完成外部操作'], targetType: 'url',
     targetUrl: 'http://127.0.0.1:8899/?taskId=pending', status: 'draft'
   } })
-  const created = (await createResponse.json()).task
-  await page.request.patch(`/api/tasks/${created.id}`, { data: { targetUrl: `http://127.0.0.1:8899/?taskId=${created.id}` } })
+  const created = (await createResponse.json()).data
+  await page.request.patch(`/api/v1/tasks/${created.id}`, { data: { targetUrl: `http://127.0.0.1:8899/?taskId=${created.id}` } })
   await page.goto('/#/tasks')
   const card = page.locator('.glass').filter({ hasText: 'E2E URL 任务' }).first()
   await card.getByRole('button', { name: '接入并验证' }).click()
@@ -90,12 +90,12 @@ test('URL 页面通过真实 SDK 握手验证，无 SDK 页面不能发布', asy
   await card.getByRole('button', { name: '发布' }).click()
   await expect(card.getByText('进行中')).toBeVisible()
 
-  const noSdkResponse = await page.request.post('/api/tasks', { data: {
+  const noSdkResponse = await page.request.post('/api/v1/tasks', { data: {
     name: 'E2E 无 SDK', description: '', steps: ['完成'], targetType: 'url',
     targetUrl: 'http://127.0.0.1:8899/no-sdk', status: 'draft'
   } })
-  const noSdk = (await noSdkResponse.json()).task
-  const publish = await page.request.patch(`/api/tasks/${noSdk.id}`, { data: { status: 'active' } })
+  const noSdk = (await noSdkResponse.json()).data
+  const publish = await page.request.patch(`/api/v1/tasks/${noSdk.id}`, { data: { status: 'active' } })
   expect(publish.status()).toBe(409)
   expect((await publish.json()).error.code).toBe('TARGET_NOT_READY')
 })
