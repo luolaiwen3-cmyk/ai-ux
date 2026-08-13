@@ -111,6 +111,12 @@ export function createRepositories(database) {
       `).get(token))
     },
 
+    findByToken(token) {
+      return mapTask(database.prepare(`${taskSelect}
+        WHERE tasks.public_token = ?
+      `).get(token))
+    },
+
     findByContentToken(token) {
       return mapTask(database.prepare(`${taskSelect}
         WHERE task_targets.content_token = ?
@@ -163,6 +169,13 @@ export function createRepositories(database) {
           task.steps.forEach((instruction, position) => insertStep.run(id, position, instruction))
         }
       })()
+      return tasks.findById(id)
+    },
+
+    updatePublicToken(id, token) {
+      database.prepare(`
+        UPDATE tasks SET public_token = ?, updated_at = ? WHERE id = ?
+      `).run(token, new Date().toISOString(), id)
       return tasks.findById(id)
     }
   }

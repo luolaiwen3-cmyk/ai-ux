@@ -72,3 +72,45 @@ test('参与者服务完成会话并隔离试跑诊断', async () => {
     database.close()
   }
 })
+
+test('开发演示任务使用固定入口并可重复初始化', () => {
+  const { database, services } = createContext()
+  try {
+    services.tasks.create({
+      name: '研究员已有任务', steps: ['完成操作'], targetType: 'builtin', status: 'draft'
+    })
+    const demo = services.tasks.seedDemo()
+    assert.equal(demo.token, 'abc123')
+    assert.equal(demo.name, '电商结算页优惠券测试')
+    assert.equal(demo.status, 'active')
+    assert.equal(demo.targetStatus, 'ready')
+    assert.deepEqual(demo.steps, ['确认购物车商品', '处理优惠券提示', '提交订单'])
+
+    const repeated = services.tasks.seedDemo()
+    assert.equal(repeated.id, demo.id)
+    assert.equal(services.tasks.list().filter((task) => task.token === 'abc123').length, 1)
+  } finally {
+    database.close()
+  }
+})
+
+test('开发演示任务会接管新架构早期生成的随机入口', () => {
+  const { database, services } = createContext()
+  try {
+    const previous = services.tasks.create({
+      name: '电商结算页优惠券测试',
+      description: '请像日常购物一样检查商品、处理优惠券并提交订单。',
+      steps: ['确认购物车商品', '处理优惠券提示', '提交订单'],
+      targetType: 'builtin',
+      status: 'active'
+    })
+    assert.notEqual(previous.token, 'abc123')
+
+    const restored = services.tasks.seedDemo()
+    assert.equal(restored.id, previous.id)
+    assert.equal(restored.token, 'abc123')
+    assert.equal(services.tasks.list().length, 1)
+  } finally {
+    database.close()
+  }
+})

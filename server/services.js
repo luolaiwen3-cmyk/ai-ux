@@ -11,6 +11,13 @@ const couponDecisions = new Set(['none', 'applied', 'declined'])
 
 const nowIso = () => new Date().toISOString()
 
+const demoTask = {
+  token: 'abc123',
+  name: '电商结算页优惠券测试',
+  description: '请像日常购物一样检查商品、处理优惠券并提交订单。',
+  steps: ['确认购物车商品', '处理优惠券提示', '提交订单']
+}
+
 const text = (value, field, { max = 500 } = {}) => {
   const normalized = typeof value === 'string' ? value.trim() : ''
   if (!normalized || normalized.length > max) {
@@ -173,13 +180,36 @@ export function createServices({ repositories, config }) {
     },
 
     seedDemo() {
-      if (repositories.tasks.count() > 0) return null
-      return taskService.create({
-        name: '电商结算页优惠券测试',
-        description: '请像日常购物一样检查商品、处理优惠券并提交订单。',
-        steps: ['确认购物车商品', '处理优惠券提示', '提交订单'],
+      const existing = repositories.tasks.findByToken(demoTask.token)
+      if (existing) return existing
+      const previousSeed = repositories.tasks.list().find((task) =>
+        task.name === demoTask.name &&
+        task.description === demoTask.description &&
+        task.targetType === 'builtin' &&
+        task.steps.length === demoTask.steps.length &&
+        task.steps.every((step, index) => step === demoTask.steps[index])
+      )
+      if (previousSeed) {
+        return repositories.tasks.updatePublicToken(previousSeed.id, demoTask.token)
+      }
+      const timestamp = nowIso()
+      return repositories.tasks.create({
+        id: randomUUID(),
+        token: demoTask.token,
+        name: demoTask.name,
+        description: demoTask.description,
+        scenario: 'checkout-coupon',
+        status: 'active',
+        steps: demoTask.steps,
         targetType: 'builtin',
-        status: 'active'
+        targetStatus: 'ready',
+        targetUrl: null,
+        targetOrigin: null,
+        contentToken: null,
+        contentRevision: null,
+        validatedAt: timestamp,
+        createdAt: timestamp,
+        updatedAt: timestamp
       })
     }
   }
