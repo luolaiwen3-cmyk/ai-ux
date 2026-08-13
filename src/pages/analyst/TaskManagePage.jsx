@@ -21,6 +21,8 @@ export default function TaskManagePage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [copiedId, setCopiedId] = useState('')
+  const [editingId, setEditingId] = useState('')
+  const [editTask, setEditTask] = useState(null)
   const [newTask, setNewTask] = useState({
     name: '',
     description: '',
@@ -74,6 +76,36 @@ export default function TaskManagePage() {
       setTasks((current) => current.map((item) => item.id === task.id ? result.task : item))
     } catch (err) {
       setError(err.message)
+    }
+  }
+
+  const beginEdit = (task) => {
+    setEditingId(task.id)
+    setEditTask({
+      name: task.name,
+      description: task.description,
+      steps: task.steps.join('\n')
+    })
+  }
+
+  const saveEdit = async () => {
+    const steps = editTask.steps.split('\n').map((step) => step.trim()).filter(Boolean)
+    if (!editTask.name.trim() || steps.length === 0) return
+    setSaving(true)
+    setError('')
+    try {
+      const result = await api.tasks.update(editingId, {
+        name: editTask.name.trim(),
+        description: editTask.description.trim(),
+        steps
+      })
+      setTasks((current) => current.map((item) => item.id === editingId ? result.task : item))
+      setEditingId('')
+      setEditTask(null)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -186,12 +218,14 @@ export default function TaskManagePage() {
                     </div>
                     <div className="text-[14px] font-medium text-slate-100">{task.name}</div>
                     <div className="text-[11px] text-slate-500 mt-0.5">电商结算页 · {task.steps.length} 个步骤 · 创建于 {new Date(task.createdAt).toLocaleDateString('zh-CN')}</div>
+                    {task.description && <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">{task.description}</p>}
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <div className="text-right">
                       <div className="text-[14px] font-semibold font-mono text-cyan-glow">{task.sessionCount}</div>
                       <div className="text-[9px] text-slate-500">会话数</div>
                     </div>
+                    <button onClick={() => beginEdit(task)} className="px-2.5 py-1.5 rounded border border-slate-200 text-[10px] text-slate-600">编辑</button>
                     {task.status === 'active' ? (
                       <button onClick={() => updateStatus(task, 'paused')} className="px-2.5 py-1.5 rounded border border-slate-200 text-[10px] text-slate-600">暂停</button>
                     ) : (
@@ -199,6 +233,15 @@ export default function TaskManagePage() {
                     )}
                   </div>
                 </div>
+
+                {editingId === task.id && editTask && (
+                  <div className="mt-4 pt-4 border-t border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <Field label="任务名称"><input value={editTask.name} onChange={(event) => setEditTask({ ...editTask, name: event.target.value })} className="form-control" /></Field>
+                    <Field label="被试说明"><textarea rows={3} value={editTask.description} onChange={(event) => setEditTask({ ...editTask, description: event.target.value })} className="form-control resize-none" /></Field>
+                    <div className="md:col-span-2"><Field label="任务步骤（每行一项）"><textarea rows={3} value={editTask.steps} onChange={(event) => setEditTask({ ...editTask, steps: event.target.value })} className="form-control resize-none" /></Field></div>
+                    <div className="md:col-span-2 flex justify-end gap-2"><button onClick={() => { setEditingId(''); setEditTask(null) }} className="px-3 py-2 rounded-lg border border-slate-200 text-xs text-slate-600">取消</button><button onClick={saveEdit} disabled={saving} className="px-3 py-2 rounded-lg bg-slate-950 text-white text-xs disabled:opacity-50">{saving ? '保存中…' : '保存修改'}</button></div>
+                  </div>
+                )}
 
                 {task.status === 'active' && (
                   <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-ink-900/60 border border-cyan-glow/10">
