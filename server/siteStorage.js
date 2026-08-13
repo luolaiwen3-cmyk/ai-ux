@@ -6,7 +6,9 @@ import { pipeline } from 'node:stream/promises'
 import { Transform } from 'node:stream'
 import yauzl from 'yauzl'
 import { createOpaqueToken } from './auth.js'
-import { HttpError } from './http.js'
+import { AppError } from './errors.js'
+
+const storageError = (status, message, code) => new AppError(status, code, message)
 
 const MAX_ARCHIVE_BYTES = 20 * 1024 * 1024
 const MAX_EXPANDED_BYTES = 100 * 1024 * 1024
@@ -55,14 +57,14 @@ async function extractZip(zipPath, destination) {
       if (settled) return
       settled = true
       zipFile.close()
-      reject(error instanceof HttpError ? error : new HttpError(400, 'ZIP 文件损坏或无法读取', 'INVALID_ZIP'))
+      reject(error instanceof AppError ? error : storageError(400, 'ZIP 文件损坏或无法读取', 'INVALID_ZIP'))
     }
 
     zipFile.on('error', fail)
     zipFile.on('end', () => {
       if (settled) return
       if (!hasIndex) {
-        fail(new HttpError(400, 'ZIP 根目录必须包含 index.html', 'INDEX_HTML_REQUIRED'))
+        fail(storageError(400, 'ZIP 根目录必须包含 index.html', 'INDEX_HTML_REQUIRED'))
         return
       }
       settled = true
@@ -71,19 +73,19 @@ async function extractZip(zipPath, destination) {
     zipFile.on('entry', async (entry) => {
       try {
         const name = safeEntryName(entry.fileName)
-        if (!name) throw new HttpError(400, 'ZIP 包含不安全的文件路径', 'UNSAFE_ZIP_PATH')
+        if (!name) throw storageError(400, 'ZIP 包含不安全的文件路径', 'UNSAFE_ZIP_PATH')
         if ((entry.generalPurposeBitFlag & 0x1) !== 0) {
-          throw new HttpError(400, '不支持加密 ZIP 文件', 'ENCRYPTED_ZIP')
+          throw storageError(400, '不支持加密 ZIP 文件', 'ENCRYPTED_ZIP')
         }
         const mode = entryMode(entry)
         if ((mode & 0o170000) === 0o120000) {
-          throw new HttpError(400, 'ZIP 不允许包含符号链接', 'ZIP_SYMLINK_NOT_ALLOWED')
+          throw storageError(400, 'ZIP 不允许包含符号链接', 'ZIP_SYMLINK_NOT_ALLOWED')
         }
 
         const isDirectory = name.endsWith('/')
         const target = path.resolve(destination, name)
         if (target !== destination && !target.startsWith(`${destination}${path.sep}`)) {
-          throw new HttpError(400, 'ZIP 包含不安全的文件路径', 'UNSAFE_ZIP_PATH')
+          throw storageError(400, 'ZIP 包含不安全的文件路径', 'UNSAFE_ZIP_PATH')
         }
         if (isDirectory) {
           await mkdir(target, { recursive: true })
@@ -93,12 +95,12 @@ async function extractZip(zipPath, destination) {
 
         const extension = path.extname(name).toLowerCase()
         if (!allowedExtensions.has(extension)) {
-          throw new HttpError(400, `ZIP 包含不支持的文件类型：${extension || name}`, 'UNSUPPORTED_SITE_FILE')
+          throw storageError(400, `ZIP 包含不支持的文件类型：${extension || name}`, 'UNSUPPORTED_SITE_FILE')
         }
         fileCount += 1
         expandedBytes += Number(entry.uncompressedSize || 0)
         if (fileCount > MAX_FILES || expandedBytes > MAX_EXPANDED_BYTES) {
-          throw new HttpError(413, '解压后的网页超过 100 MiB 或 1000 个文件上限', 'SITE_TOO_LARGE')
+          throw storageError(413, '解压后的网页超过 100 MiB 或 1000 个文件上限', 'SITE_TOO_LARGE')
         }
         if (name === 'index.html') hasIndex = true
 
@@ -123,11 +125,11 @@ export function createSiteStorage(rootDir) {
     async installZip(request, task) {
       const contentType = String(request.headers['content-type'] || '').split(';')[0].trim()
       if (!['application/zip', 'application/x-zip-compressed'].includes(contentType)) {
-        throw new HttpError(415, '请上传 ZIP 格式的静态网站', 'UNSUPPORTED_MEDIA_TYPE')
+        throw storageError(415, '请上传 ZIP 格式的静态网站', 'UNSUPPORTED_MEDIA_TYPE')
       }
       const contentLength = Number(request.headers['content-length'] || 0)
       if (contentLength > MAX_ARCHIVE_BYTES) {
-        throw new HttpError(413, 'ZIP 文件不能超过 20 MiB', 'SITE_ARCHIVE_TOO_LARGE')
+        throw storageError(413, 'ZIP 文件不能超过 20 MiB', 'SITE_ARCHIVE_TOO_LARGE')
       }
 
       await mkdir(resolvedRoot, { recursive: true })
@@ -141,12 +143,12 @@ export function createSiteStorage(rootDir) {
           transform(chunk, _encoding, callback) {
             received += chunk.length
             callback(received > MAX_ARCHIVE_BYTES
-              ? new HttpError(413, 'ZIP 文件不能超过 20 MiB', 'SITE_ARCHIVE_TOO_LARGE')
+              ? storageError(413, 'ZIP 文件不能超过 20 MiB', 'SITE_ARCHIVE_TOO_LARGE')
               : null, chunk)
           }
         })
         await pipeline(request, limiter, createWriteStream(archivePath, { flags: 'wx' }))
-        if (received === 0) throw new HttpError(400, 'ZIP 文件不能为空', 'EMPTY_SITE_ARCHIVE')
+        if (received === 0) throw storageError(400, 'ZIP 文件不能为空', 'EMPTY_SITE_ARCHIVE')
         const details = await extractZip(archivePath, extractPath)
 
         const revision = randomBytes(8).toString('hex')
@@ -166,8 +168,8 @@ export function createSiteStorage(rootDir) {
           ...details
         }
       } catch (error) {
-        if (error instanceof HttpError) throw error
-        throw new HttpError(400, 'ZIP 文件损坏或无法读取', 'INVALID_ZIP')
+        if (error instanceof AppError) throw error
+        throw storageError(400, 'ZIP 文件损坏或无法读取', 'INVALID_ZIP')
       } finally {
         await rm(temporary, { recursive: true, force: true })
       }

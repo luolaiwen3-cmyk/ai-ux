@@ -5,7 +5,6 @@ import path from 'node:path'
 import { Readable } from 'node:stream'
 import test from 'node:test'
 import yazl from 'yazl'
-import { createStore } from '../server/db.js'
 import { createSiteStorage } from '../server/siteStorage.js'
 
 const createZip = (files) => new Promise((resolve, reject) => {
@@ -26,23 +25,16 @@ const requestFor = (buffer) => {
 
 test('静态网站 ZIP 会被安全安装并生成不可预测访问标识', async () => {
   const root = mkdtempSync(path.join(os.tmpdir(), 'insightux-sites-'))
-  const store = createStore(':memory:')
-  try {
-    const task = store.createTask({
-      name: 'ZIP 任务', description: '', steps: ['完成'], targetType: 'upload', status: 'draft'
-    })
-    const archive = await createZip({
-      'index.html': '<!doctype html><h1>Test</h1><script src="app.js"></script>',
-      'app.js': 'document.body.dataset.ready = "yes"',
-      'assets/logo.svg': '<svg xmlns="http://www.w3.org/2000/svg" />'
-    })
-    const installed = await createSiteStorage(root).installZip(requestFor(archive), task)
-    assert.equal(installed.fileCount, 3)
-    assert.equal(installed.targetStatus, 'ready')
-    assert.match(installed.contentToken, /^[A-Za-z0-9_-]+$/)
-  } finally {
-    store.close()
-  }
+  const task = { id: 'task-1', contentToken: null, contentRevision: null }
+  const archive = await createZip({
+    'index.html': '<!doctype html><h1>Test</h1><script src="app.js"></script>',
+    'app.js': 'document.body.dataset.ready = "yes"',
+    'assets/logo.svg': '<svg xmlns="http://www.w3.org/2000/svg" />'
+  })
+  const installed = await createSiteStorage(root).installZip(requestFor(archive), task)
+  assert.equal(installed.fileCount, 3)
+  assert.equal(installed.targetStatus, 'ready')
+  assert.match(installed.contentToken, /^[A-Za-z0-9_-]+$/)
 })
 
 test('静态网站 ZIP 拒绝缺失入口和路径穿越', async () => {
@@ -61,4 +53,3 @@ test('静态网站 ZIP 拒绝缺失入口和路径穿越', async () => {
   }
   await assert.rejects(() => storage.installZip(requestFor(maliciousArchive), task), /不安全|损坏/)
 })
-
