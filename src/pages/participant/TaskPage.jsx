@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import CheckoutPage from '../../components/participant/CheckoutPage.jsx'
+import CustomWebTask from '../../components/participant/CustomWebTask.jsx'
 import { startRecording, stopRecording, saveToStorage, deleteSession } from '../../lib/rrwebRecorder.js'
 import { initMediaPipe, getCameraStream, startTracking, stopTracking, saveFrame, loadFrames, deleteFaceSession } from '../../lib/mediaPipeTracker.js'
 import { api, clearParticipantSession, getParticipantToken } from '../../lib/apiClient.js'
@@ -22,12 +23,16 @@ export default function TaskPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [sessionReady, setSessionReady] = useState(false)
+  const [session, setSession] = useState(null)
   const recordingRef = useRef(false)
   const pendingPayloadRef = useRef(null)
   const eventCountRef = useRef(0)
   const videoRef = useRef(null)
   const streamRef = useRef(null)
   const lastFaceCaptureRef = useRef(0)
+  const customTaskRef = useRef(null)
+  const customEventsRef = useRef([])
+  const customTask = session?.target?.type && session.target.type !== 'builtin'
 
   // 先校验匿名会话凭证，再开始任何采集。
   useEffect(() => {
@@ -44,6 +49,7 @@ export default function TaskPage() {
           navigate('/thanks', { replace: true })
           return
         }
+        setSession(session)
         setSessionReady(true)
       })
       .catch(() => {
@@ -56,6 +62,7 @@ export default function TaskPage() {
   // 会话通过服务端校验后开始录制 + 面部采集。
   useEffect(() => {
     if (!sessionReady) return undefined
+    const customEvents = customEventsRef.current
 
     const startFaceCapture = async () => {
       try {
@@ -86,17 +93,19 @@ export default function TaskPage() {
       }
     }
 
-    // 1. 开始 rrweb 录制
-    const onEvent = (event) => {
-      if (event.type === '_stopped') {
-        setStopReason(event.reason)
-        return
+    // 1. 内置任务在父页面录制；自定义网页由 iframe 内的 SDK 录制。
+    if (!customTask) {
+      const onEvent = (event) => {
+        if (event.type === '_stopped') {
+          setStopReason(event.reason)
+          return
+        }
+        eventCountRef.current += 1
       }
-      eventCountRef.current += 1
+      startRecording(onEvent)
+      setRecording(true)
+      recordingRef.current = true
     }
-    startRecording(onEvent)
-    setRecording(true)
-    recordingRef.current = true
 
     // 每 500ms 同步一次计数到 state
     const timer = setInterval(() => {
@@ -112,8 +121,12 @@ export default function TaskPage() {
       clearInterval(timer)
       // 非正常离开时保留本机缓冲，便于重新进入后人工恢复或排障。
       if (recordingRef.current) {
-        stopRecording()
-        saveToStorage(sessionId)
+        if (customTask) {
+          saveToStorage(sessionId, customEvents)
+        } else {
+          stopRecording()
+          saveToStorage(sessionId)
+        }
       }
       // 停止面部采集
       stopTracking()
@@ -126,7 +139,7 @@ export default function TaskPage() {
         videoRef.current = null
       }
     }
-  }, [sessionId, sessionReady, location.state?.behaviorOnly])
+  }, [sessionId, sessionReady, customTask, location.state?.behaviorOnly])
 
   const submitPayload = useCallback(async (payload) => {
     setSubmitting(true)
@@ -170,9 +183,48 @@ export default function TaskPage() {
     await submitPayload(payload)
   }, [sessionId, couponDecision, location.state?.behaviorOnly, submitting, submitPayload])
 
+  const handleCustomEvents = useCallback((nextEvents) => {
+    customEventsRef.current.push(...nextEvents)
+    eventCountRef.current = customEventsRef.current.length
+  }, [])
+
+  const handleCustomRecording = useCallback((active) => {
+    recordingRef.current = active
+    setRecording(active)
+  }, [])
+
+  const handleCustomStopped = useCallback((reason) => {
+    if (reason && reason !== 'manual') setStopReason(reason)
+  }, [])
+
+  const handleCustomComplete = useCallback(async () => {
+    if (submitting) return
+    await customTaskRef.current?.stop()
+    recordingRef.current = false
+    setRecording(false)
+    const events = customEventsRef.current
+    setEventCount(events.length)
+    saveToStorage(sessionId, events)
+    stopTracking()
+    streamRef.current?.getTracks().forEach((track) => track.stop())
+    const firstTimestamp = events[0]?.timestamp || Date.now()
+    const lastTimestamp = events.at(-1)?.timestamp || firstTimestamp
+    const payload = {
+      events,
+      faceFrames: location.state?.behaviorOnly ? [] : loadFrames(sessionId),
+      couponDecision: 'none',
+      duration: Math.max(0, lastTimestamp - firstTimestamp),
+      metrics: {},
+      result: { completion: 'manual' }
+    }
+    pendingPayloadRef.current = payload
+    await submitPayload(payload)
+  }, [location.state?.behaviorOnly, sessionId, submitPayload, submitting])
+
   const handleExit = async () => {
     if (!window.confirm('确认退出？尚未提交的数据将从服务器和本机删除。')) return
-    stopRecording()
+    if (customTask) await customTaskRef.current?.stop()
+    else stopRecording()
     recordingRef.current = false
     stopTracking()
     streamRef.current?.getTracks().forEach((track) => track.stop())
@@ -216,8 +268,9 @@ export default function TaskPage() {
         退出并删除数据
       </button>
 
-      {/* 真实的结算页 */}
-      <CheckoutPage onDecision={(use) => setCouponDecision(use ? 'applied' : 'declined')} onSubmit={handleTaskComplete} />
+      {sessionReady && (customTask
+        ? <CustomWebTask ref={customTaskRef} session={session} onEvents={handleCustomEvents} onRecordingChange={handleCustomRecording} onStopped={handleCustomStopped} onComplete={handleCustomComplete} disabled={submitting} />
+        : <CheckoutPage onDecision={(use) => setCouponDecision(use ? 'applied' : 'declined')} onSubmit={handleTaskComplete} />)}
 
       {submitting && <div className="fixed inset-0 z-[80] bg-slate-950/30 flex items-center justify-center" data-no-record><div className="bg-white rounded-xl px-6 py-4 text-sm text-slate-700 shadow-xl">正在安全保存测试数据…</div></div>}
 

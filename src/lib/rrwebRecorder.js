@@ -167,15 +167,16 @@ export const getDuration = () => {
  * 将事件序列化存储到 localStorage（跨标签页共享）
  * @param {string} sessionId - 会话 ID
  */
-export const saveToStorage = (sessionId = 'default-session') => {
+export const saveToStorage = (sessionId = 'default-session', eventOverride = null) => {
   try {
+    const storedEvents = Array.isArray(eventOverride) ? eventOverride : events
     // 如果没有 FullSnapshot，手动捕获一个
-    if (events.length > 0 && !events.some(e => e.type === 0)) {
+    if (!eventOverride && storedEvents.length > 0 && !storedEvents.some(e => e.type === 0)) {
       const domSnapshot = snapshot(document)
       if (domSnapshot) {
-        events.unshift({
+        storedEvents.unshift({
           type: 0,
-          timestamp: events[0].timestamp - 1,
+          timestamp: storedEvents[0].timestamp - 1,
           data: {
             node: domSnapshot,
             initialOffset: { left: window.scrollX, top: window.scrollY }
@@ -185,7 +186,7 @@ export const saveToStorage = (sessionId = 'default-session') => {
     }
 
     const key = `rrweb-events-${sessionId}`
-    localStorage.setItem(key, JSON.stringify(events))
+    localStorage.setItem(key, JSON.stringify(storedEvents))
 
     // 同时更新会话索引
     const indexKey = 'rrweb-session-index'
@@ -198,8 +199,8 @@ export const saveToStorage = (sessionId = 'default-session') => {
     const existingIdx = index.findIndex(s => s.id === sessionId)
     const sessionMeta = {
       id: sessionId,
-      eventCount: events.length,
-      duration: getDuration(),
+      eventCount: storedEvents.length,
+      duration: storedEvents.length > 1 ? storedEvents.at(-1).timestamp - storedEvents[0].timestamp : 0,
       savedAt: Date.now()
     }
     if (existingIdx >= 0) {

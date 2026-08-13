@@ -43,6 +43,7 @@ test('任务 Token 可以创建并完成唯一会话', () => {
     assert.equal(completed.metrics.totalDurationMs, 3200)
     assert.equal(completed.metrics.finalDecision, 'applied')
     assert.deepEqual(completed.metrics.taskResult, { totalClicks: 1 })
+    assert.deepEqual(completed.result, {})
 
     const diagnosis = store.saveDiagnosis(first.id, {
       provider: 'local-rules',
@@ -103,6 +104,12 @@ test('自定义网页任务验证前不能发布，试跑会话使用独立编�
     assert.equal(trial.participantCode, 'T-001')
     assert.equal(store.listSessions().length, 0)
     assert.equal(store.listSessions({ scope: 'trial' }).length, 1)
+    store.startSession(trial.id)
+    const completed = store.completeSession(trial.id, {
+      events: [{ type: 0, timestamp: 1000 }], faceFrames: [], couponDecision: 'none',
+      result: { completion: 'manual' }
+    })
+    assert.deepEqual(completed.result, { completion: 'manual' })
   } finally {
     store.close()
   }
