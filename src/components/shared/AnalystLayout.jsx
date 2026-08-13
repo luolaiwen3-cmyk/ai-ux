@@ -19,7 +19,7 @@ export default function AnalystLayout({ children }) {
   return (
     <div className="analyst-theme relative z-10 flex h-screen bg-white text-slate-900">
       {/* 左侧导航 */}
-      <aside className="w-56 shrink-0 border-r border-slate-200 bg-white flex flex-col">
+      <aside className="hidden md:flex w-56 shrink-0 border-r border-slate-200 bg-white flex-col">
         {/* Logo */}
         <div className="px-5 py-4 border-b border-slate-200">
           <div className="flex items-center gap-2.5">
@@ -72,6 +72,13 @@ export default function AnalystLayout({ children }) {
 
       {/* 右侧内容 */}
       <div className="flex-1 min-w-0 overflow-y-auto">
+        <div className="md:hidden sticky top-0 z-50 bg-white border-b border-slate-200 px-3 py-2 flex items-center gap-2 overflow-x-auto">
+          <span className="font-semibold text-sm text-slate-950 mr-1">InsightUX</span>
+          {navItems.map((item) => (
+            <Link key={item.path} to={item.path} className={`px-2.5 py-1.5 rounded-md text-xs whitespace-nowrap ${location.pathname === item.path ? 'bg-slate-950 text-white' : 'text-slate-600 bg-slate-100'}`}>{item.label}</Link>
+          ))}
+          <button onClick={logout} className="ml-auto px-2 py-1.5 text-xs text-slate-500 whitespace-nowrap">退出</button>
+        </div>
         <ErrorBoundary>{children}</ErrorBoundary>
       </div>
     </div>
