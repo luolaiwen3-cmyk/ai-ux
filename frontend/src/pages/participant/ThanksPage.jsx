@@ -1,10 +1,30 @@
-import React from 'react'
+import React, { useState } from 'react'
+import { sessionsApi } from '../../api/client.js'
+import { syncPending } from '../../storage/uploadQueue.js'
 
 /**
  * 测试完成页 —— 被试任务结束后的收尾
  * 仅致谢，不进入分析工作台
  */
 export default function ThanksPage() {
+  const activeSession = JSON.parse(sessionStorage.getItem('insightux-active-session') || 'null')
+  const [syncState, setSyncState] = useState(sessionStorage.getItem('insightux-sync-status') || 'complete')
+  const [error, setError] = useState(sessionStorage.getItem('insightux-sync-error') || '')
+
+  const retry = async () => {
+    if (!activeSession) return
+    setSyncState('syncing')
+    setError('')
+    try {
+      await syncPending(activeSession.id)
+      await sessionsApi.complete(activeSession.id, activeSession.upload_token, { duration_ms: 0, stop_reason: 'manual' })
+      sessionStorage.setItem('insightux-sync-status', 'complete')
+      setSyncState('complete')
+    } catch (err) {
+      setError(err.message)
+      setSyncState('pending')
+    }
+  }
   return (
     <div className="min-h-screen bg-[#F5F5F7] flex flex-col">
       <header className="bg-white border-b border-slate-200">
@@ -30,6 +50,7 @@ export default function ThanksPage() {
               <br />
               您可以安全关闭此页面。
             </p>
+            {syncState !== 'complete' && <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-left"><div className="text-xs font-medium text-amber-800">{syncState === 'syncing' ? '正在同步测试数据…' : '部分数据尚未同步'}</div>{error && <div className="text-[11px] text-amber-700 mt-1">{error}</div>}<button onClick={retry} disabled={syncState === 'syncing'} className="mt-3 px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs disabled:opacity-50">重新同步</button></div>}
             <div className="bg-slate-50 rounded-xl p-4 text-left">
               <div className="text-xs font-medium text-slate-700 mb-2">接下来</div>
               <ul className="text-xs text-slate-500 space-y-1.5">

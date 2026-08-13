@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import CheckoutPage from '../../components/participant/CheckoutPage.jsx'
-import { startRecording, stopRecording, saveToStorage } from '../../lib/rrwebRecorder.js'
-import { initMediaPipe, getCameraStream, startTracking, stopTracking, saveFrame } from '../../lib/mediaPipeTracker.js'
+import { startRecording, stopRecording } from '../../lib/rrwebRecorder.js'
+import { initMediaPipe, getCameraStream, startTracking, stopTracking, simplifyFrame } from '../../lib/mediaPipeTracker.js'
+import { sessionsApi } from '../../api/client.js'
+import { enqueueBatch, syncPending } from '../../storage/uploadQueue.js'
 
 /**
  * P3 测试任务页 —— 被试实际操作的核心页面
@@ -22,6 +24,18 @@ export default function TaskPage() {
   const videoRef = useRef(null)
   const streamRef = useRef(null)
   const lastFaceCaptureRef = useRef(0)
+  const rrwebBufferRef = useRef([])
+  const faceBufferRef = useRef([])
+  const startedAtRef = useRef(Date.now())
+  const activeSession = JSON.parse(sessionStorage.getItem('insightux-active-session') || 'null')
+  const uploadToken = activeSession?.id === sessionId ? activeSession.upload_token : null
+
+  const flushBuffers = useCallback(async () => {
+    const rrwebRecords = rrwebBufferRef.current.splice(0)
+    const faceRecords = faceBufferRef.current.splice(0)
+    if (rrwebRecords.length) await enqueueBatch(sessionId, uploadToken, 'rrweb', rrwebRecords)
+    if (faceRecords.length) await enqueueBatch(sessionId, uploadToken, 'face', faceRecords)
+  }, [sessionId, uploadToken])
 
   // 页面加载时开始录制 + 面部采集
   useEffect(() => {
@@ -32,6 +46,8 @@ export default function TaskPage() {
         return
       }
       eventCountRef.current += 1
+      rrwebBufferRef.current.push(event)
+      if (rrwebBufferRef.current.length >= 200) void flushBuffers()
     }
     startRecording(onEvent)
     setRecording(true)
@@ -43,16 +59,20 @@ export default function TaskPage() {
         setEventCount(eventCountRef.current)
       }
     }, 500)
+    const flushTimer = setInterval(() => {
+      void flushBuffers().then(() => syncPending(sessionId)).catch(() => {})
+    }, 2000)
 
     // 2. 开始 MediaPipe 面部采集（后台静默）
     startFaceCapture()
 
     return () => {
       clearInterval(timer)
-      // 停止录制并保存
+      clearInterval(flushTimer)
+      // 停止录制并将剩余数据放入持久上传队列
       if (recordingRef.current) {
         stopRecording()
-        saveToStorage(sessionId)
+        void flushBuffers()
       }
       // 停止面部采集
       stopTracking()
@@ -65,7 +85,7 @@ export default function TaskPage() {
         videoRef.current = null
       }
     }
-  }, [sessionId])
+  }, [sessionId, flushBuffers])
 
   // 启动面部采集
   const startFaceCapture = async () => {
@@ -105,7 +125,7 @@ export default function TaskPage() {
         const now = Date.now()
         if (now - lastFaceCaptureRef.current > 200) {
           lastFaceCaptureRef.current = now
-          saveFrame(sessionId, result)
+          faceBufferRef.current.push(simplifyFrame(result))
         }
       })
     } catch (err) {
@@ -114,15 +134,26 @@ export default function TaskPage() {
   }
 
   // 任务完成（优惠券决策或时长到达）→ 保存后进入感谢页
-  const handleTaskComplete = useCallback(() => {
+  const handleTaskComplete = useCallback(async () => {
     if (!recordingRef.current) return
     const events = stopRecording()
     recordingRef.current = false
     setRecording(false)
     setEventCount(events.length)
-    saveToStorage(sessionId)
+    try {
+      await flushBuffers()
+      await syncPending(sessionId)
+      await sessionsApi.complete(sessionId, uploadToken, {
+        duration_ms: Date.now() - startedAtRef.current,
+        stop_reason: 'manual'
+      })
+      sessionStorage.setItem('insightux-sync-status', 'complete')
+    } catch (error) {
+      sessionStorage.setItem('insightux-sync-status', 'pending')
+      sessionStorage.setItem('insightux-sync-error', error.message)
+    }
     navigate('/thanks', { replace: true })
-  }, [sessionId, navigate])
+  }, [sessionId, uploadToken, navigate, flushBuffers])
 
   // 监听优惠券弹窗关闭 = 任务关键节点
   useEffect(() => {

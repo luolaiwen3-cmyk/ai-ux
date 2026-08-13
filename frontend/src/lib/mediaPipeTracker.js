@@ -229,62 +229,15 @@ export const estimateEmotion = (blendshapes) => {
 }
 
 /**
- * 保存面部帧数据到 localStorage
- * @param {string} sessionId - 会话 ID
+ * 提取可持久化的面部特征；不保存原始画面。
  * @param {Object} frame - 帧数据 { landmarks, emotion, timestamp }
  */
-export const saveFrame = (sessionId, frame) => {
-  try {
-    const key = `mediapipe-frames-${sessionId}`
-    let frames = []
-    try {
-      frames = JSON.parse(localStorage.getItem(key) || '[]')
-    } catch { frames = [] }
-
-    const simplifiedFrame = {
-      t: frame.timestamp,
-      emotion: frame.emotion,
-      keyPoints: frame.landmarks ? getKeypoints(frame.landmarks) : null,
-      faceDetected: frame.faceDetected,
-      // 仅保存派生特征，不保存原始视频或截图。
-    }
-
-    frames.push(simplifiedFrame)
-
-    // 限制最大帧数（20s × 5fps = 100 帧）
-    if (frames.length > 100) {
-      frames = frames.slice(-100)
-    }
-
-    localStorage.setItem(key, JSON.stringify(frames))
-
-    // 更新索引
-    const indexKey = 'mediapipe-session-index'
-    let index = []
-    try {
-      index = JSON.parse(localStorage.getItem(indexKey) || '[]')
-    } catch { index = [] }
-
-    const existingIdx = index.findIndex(s => s.id === sessionId)
-    const meta = {
-      id: sessionId,
-      frameCount: frames.length,
-      lastEmotion: frame.emotion,
-      updatedAt: Date.now()
-    }
-    if (existingIdx >= 0) {
-      index[existingIdx] = meta
-    } else {
-      index.unshift(meta)
-    }
-    localStorage.setItem(indexKey, JSON.stringify(index))
-
-    return true
-  } catch (e) {
-    console.error('[MediaPipe] 保存帧失败:', e)
-    return false
-  }
-}
+export const simplifyFrame = (frame) => ({
+  t: frame.timestamp,
+  emotion: frame.emotion,
+  keyPoints: frame.landmarks ? getKeypoints(frame.landmarks) : null,
+  faceDetected: frame.faceDetected
+})
 
 /**
  * 获取关键点（10 个核心位置用于渲染）
