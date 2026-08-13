@@ -12,7 +12,7 @@ const isProduction = process.env.NODE_ENV === 'production'
 export const config = {
   host: process.env.HOST || '0.0.0.0',
   port: Number(process.env.PORT || 8787),
-  databasePath: path.resolve(process.env.INSIGHTUX_DB_PATH || './data/insightux.db'),
+  databasePath: path.resolve(process.env.INSIGHTUX_DB_PATH || './data/data.db'),
   siteDir: path.resolve(process.env.INSIGHTUX_SITE_DIR || './data/task-sites'),
   adminPassword: process.env.ADMIN_PASSWORD || 'insightux-demo',
   sessionSecret: process.env.ADMIN_SESSION_SECRET || 'insightux-development-secret-change-me',
@@ -20,6 +20,9 @@ export const config = {
   dashscopeApiKey: process.env.DASHSCOPE_API_KEY || '',
   qwenBaseUrl: process.env.QWEN_BASE_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1',
   qwenModel: process.env.QWEN_MODEL || 'qwen3-vl-plus',
+  seedDemo: process.env.INSIGHTUX_SEED_DEMO
+    ? process.env.INSIGHTUX_SEED_DEMO === 'true'
+    : !isProduction,
   isProduction
 }
 

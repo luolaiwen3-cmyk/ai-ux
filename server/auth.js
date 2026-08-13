@@ -5,7 +5,8 @@ import {
   timingSafeEqual
 } from 'node:crypto'
 
-const COOKIE_NAME = 'insightux_admin'
+export const ADMIN_COOKIE_NAME = 'insightux_admin'
+const COOKIE_NAME = ADMIN_COOKIE_NAME
 const SESSION_TTL_SECONDS = 12 * 60 * 60
 
 export const createOpaqueToken = (bytes = 24) => randomBytes(bytes).toString('base64url')
