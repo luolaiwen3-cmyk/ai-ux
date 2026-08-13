@@ -47,7 +47,7 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-lg font-semibold text-slate-100">仪表盘</h1>
-            <p className="text-xs text-slate-500 mt-0.5">欢迎回来，今日已发现 11 个 UX 问题</p>
+            <p className="text-xs text-slate-500 mt-0.5">欢迎回来，今日已发现 {stats?.totalIssues ?? 0} 个 UX 问题</p>
           </div>
           <div className="flex items-center gap-2">
             <button

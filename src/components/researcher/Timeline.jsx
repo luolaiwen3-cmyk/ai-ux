@@ -1,18 +1,56 @@
-import React, { useRef } from 'react'
+import React, { useRef, useMemo } from 'react'
 
 /**
  * 回放时间轴 —— 可拖拽 scrub，带关键事件标记
+ *
+ * @param {Array} events  - 静态事件标记（可选）
+ * @param {Array} stressData - 压力曲线数据 [{t, stress}]，用于动态计算 peak 事件
  */
 export default function Timeline({
   currentTime,
   duration,
   events,
+  stressData = null,
   onScrub,
   playing,
   onPlayPause,
   speed,
   onSpeedChange
 }) {
+  // 根据 stressData 动态生成事件标记
+  const dynamicEvents = useMemo(() => {
+    if (!stressData || stressData.length === 0) return events || []
+
+    const generated = [
+      { t: 0, type: 'start', label: '会话开始' }
+    ]
+
+    // 找压力峰值
+    let peakStress = 0
+    let peakTime = 0
+    stressData.forEach((d) => {
+      if (d.stress > peakStress) {
+        peakStress = d.stress
+        peakTime = d.t
+      }
+    })
+
+    // 找压力首次显著上升点（> 0.3）
+    const firstRise = stressData.find((d) => d.stress > 0.3)
+    if (firstRise) {
+      generated.push({ t: firstRise.t * 1000, type: 'confusion', label: '认知压力上升' })
+    }
+
+    // 压力峰值标记
+    if (peakStress > 0.5) {
+      generated.push({ t: peakTime * 1000, type: 'peak', label: `压力峰值 ${(peakStress * 100).toFixed(0)}%` })
+    }
+
+    // 结束标记
+    generated.push({ t: duration * 1000, type: 'end', label: '会话结束' })
+
+    return generated
+  }, [stressData, events, duration])
   const trackRef = useRef(null)
 
   const handleClick = (e) => {
@@ -65,7 +103,7 @@ export default function Timeline({
         />
 
         {/* 关键事件标记 */}
-        {events.map((ev, i) => {
+        {dynamicEvents.map((ev, i) => {
           const left = (ev.t / 1000 / duration) * 100
           const colorMap = {
             start: '#64748b',

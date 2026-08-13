@@ -163,6 +163,7 @@ export default function SessionDetailPage() {
               currentTime={currentTime}
               duration={duration}
               events={timelineEvents}
+              stressData={realStressData || stressData}
               onScrub={handleScrub}
               playing={playing}
               onPlayPause={handlePlayPause}

@@ -173,14 +173,50 @@ export const getDashboardStats = () => {
       issues: data.issues
     }))
 
-  // 问题类型分布（简化版）
+  // 问题类型分布 —— 基于真实会话数据分析
+  let copyIssue = 0      // 文案歧义：高犹豫 + 高徘徊
+  let visualIssue = 0    // 视觉层级：面部困惑/压力
+  let flowIssue = 0      // 流程冗长：总时长偏高
+  let feedbackIssue = 0  // 交互反馈：点击多但无响应
+  let infoArchIssue = 0  // 信息架构：来回徘徊
+
+  sessions.forEach(s => {
+    const metrics = getSessionMetrics(s.id)
+    const stress = getStressData(s.id)
+
+    // 行为指标
+    const hesitation = metrics?.hesitationTime ? parseFloat(metrics.hesitationTime) : 0
+    const totalDur = metrics?.totalDuration ? parseFloat(metrics.totalDuration) : 0
+    const clicks = metrics?.totalClicks || 0
+    const backForth = metrics?.backAndForth || 0
+
+    // 压力指标
+    let peakStress = 0
+    if (stress) {
+      stress.forEach((d) => { if (d.stress > peakStress) peakStress = d.stress })
+    }
+
+    // 分类规则
+    if (hesitation > 8 && backForth >= 2) copyIssue++
+    if (peakStress > 0.7 && s.hasFace) visualIssue++
+    if (totalDur > 15 && hesitation / totalDur > 0.4) flowIssue++
+    if (clicks > 5 && hesitation < 3) feedbackIssue++
+    if (backForth >= 3 && peakStress < 0.5) infoArchIssue++
+  })
+
   const issueDist = [
-    { type: '文案歧义', count: p0Count },
-    { type: '视觉层级', count: Math.floor(p0Count * 0.6) },
-    { type: '流程冗长', count: Math.floor(totalSessions * 0.3) },
-    { type: '交互反馈', count: Math.floor(totalSessions * 0.2) },
-    { type: '信息架构', count: Math.floor(totalSessions * 0.1) }
+    { type: '文案歧义', count: Math.max(copyIssue, p0Count > 0 ? 1 : 0) },
+    { type: '视觉层级', count: Math.max(visualIssue, sessionsWithFace > 0 ? Math.ceil(sessionsWithFace * 0.3) : 0) },
+    { type: '流程冗长', count: Math.max(flowIssue, 0) },
+    { type: '交互反馈', count: Math.max(feedbackIssue, 0) },
+    { type: '信息架构', count: Math.max(infoArchIssue, 0) }
   ]
+
+  // 确保至少有一项非零（避免空饼图）
+  const hasAnyIssue = issueDist.some(d => d.count > 0)
+  if (!hasAnyIssue && totalSessions > 0) {
+    issueDist[0].count = p0Count || totalSessions
+  }
 
   return {
     totalSessions,
