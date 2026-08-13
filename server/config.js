@@ -14,7 +14,7 @@ export const config = {
   port: Number(process.env.PORT || 8787),
   databasePath: path.resolve(process.env.INSIGHTUX_DB_PATH || './data/data.db'),
   siteDir: path.resolve(process.env.INSIGHTUX_SITE_DIR || './data/task-sites'),
-  adminPassword: process.env.ADMIN_PASSWORD || 'insightux-demo',
+  adminPassword: process.env.ADMIN_PASSWORD || 'demo',
   sessionSecret: process.env.ADMIN_SESSION_SECRET || 'insightux-development-secret-change-me',
   publicAppUrl: process.env.PUBLIC_APP_URL || 'http://localhost:8787',
   dashscopeApiKey: process.env.DASHSCOPE_API_KEY || '',
@@ -32,7 +32,7 @@ export function validateConfig() {
   }
 
   if (isProduction) {
-    if (!process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD === 'change-me') {
+    if (!process.env.ADMIN_PASSWORD || ['demo', 'change-me'].includes(process.env.ADMIN_PASSWORD)) {
       throw new Error('生产环境必须设置安全的 ADMIN_PASSWORD')
     }
     if (!process.env.ADMIN_SESSION_SECRET || process.env.ADMIN_SESSION_SECRET.length < 32) {

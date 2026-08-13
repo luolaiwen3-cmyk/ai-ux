@@ -54,7 +54,7 @@ npm run dev
 - OpenAPI 文档：<http://localhost:8787/docs>
 - 内置演示任务：<http://localhost:5173/#/join/abc123>
 
-`.env.example` 中的默认值仅供本地开发。分析端打开 <http://localhost:5173/#/>，默认开发密码为 `change-me`（复制示例配置后）；请在首次运行前修改。
+`.env.example` 中的默认值仅供本地开发。分析端打开 <http://localhost:5173/#/>，默认开发密码为 `demo`；生产部署必须通过 `ADMIN_PASSWORD` 设置其他安全密码。
 
 ## AI 配置
 
