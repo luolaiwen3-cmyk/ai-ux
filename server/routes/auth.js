@@ -43,7 +43,7 @@ export function authRoutes(app, _options, done) {
     if (!app.verifyAdminPassword(request.body.password)) {
       throw unauthorized('INVALID_CREDENTIALS', '管理员密码错误')
     }
-    reply.setCookie(ADMIN_COOKIE_NAME, 'admin', {
+    reply.setCookie(ADMIN_COOKIE_NAME, app.createAdminSession(), {
       path: '/',
       httpOnly: true,
       sameSite: 'strict',
@@ -69,9 +69,7 @@ export function authRoutes(app, _options, done) {
   app.get('/me', {
     schema: { tags: ['auth'] }
   }, async (request) => {
-    const signed = request.cookies[ADMIN_COOKIE_NAME]
-    const parsed = signed ? request.unsignCookie(signed) : null
-    if (!parsed?.valid || parsed.value !== 'admin') {
+    if (!app.isAdminRequest(request)) {
       throw unauthorized('UNAUTHORIZED', '请先登录')
     }
     return { data: authenticated }

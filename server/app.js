@@ -24,6 +24,13 @@ const runtimeLogger = {
   }
 }
 
+const adminSessionTtlSeconds = 12 * 60 * 60
+
+const createAdminSession = () => Buffer.from(JSON.stringify({
+  role: 'admin',
+  expiresAt: Math.floor(Date.now() / 1000) + adminSessionTtlSeconds
+})).toString('base64url')
+
 const errorPayload = (request, code, message, details) => ({
   error: {
     code,
@@ -56,12 +63,22 @@ export function createApp({
   app.decorate('services', services)
   app.decorate('siteStorage', siteStorage)
   app.decorate('verifyAdminPassword', (password) => verifyPassword(password, config.adminPassword))
+  app.decorate('createAdminSession', createAdminSession)
 
   app.register(cookie, { secret: config.sessionSecret, hook: 'onRequest' })
-  app.decorate('requireAdmin', async (request) => {
+  app.decorate('isAdminRequest', (request) => {
     const signed = request.cookies[ADMIN_COOKIE_NAME]
     const parsed = signed ? request.unsignCookie(signed) : null
-    if (!parsed?.valid || parsed.value !== 'admin') {
+    if (!parsed?.valid) return false
+    try {
+      const session = JSON.parse(Buffer.from(parsed.value, 'base64url').toString('utf8'))
+      return session.role === 'admin' && session.expiresAt > Math.floor(Date.now() / 1000)
+    } catch {
+      return false
+    }
+  })
+  app.decorate('requireAdmin', async (request) => {
+    if (!app.isAdminRequest(request)) {
       throw unauthorized('UNAUTHORIZED', '请先登录')
     }
   })
