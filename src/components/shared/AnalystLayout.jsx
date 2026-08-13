@@ -1,12 +1,14 @@
 import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import ErrorBoundary from './ErrorBoundary.jsx'
+import { useAuth } from '../../context/AuthContext.jsx'
 
 /**
  * 分析人员端共享布局 —— 左侧导航 + 右侧内容区
  */
 export default function AnalystLayout({ children }) {
   const location = useLocation()
+  const { user, logout } = useAuth()
 
   const navItems = [
     { path: '/', label: '仪表盘', icon: '◧' },
@@ -61,8 +63,8 @@ export default function AnalystLayout({ children }) {
               A
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-[11px] text-slate-900 truncate">Admin</div>
-              <div className="text-[9px] text-slate-500 font-mono truncate">admin@insightux.io</div>
+              <div className="text-[11px] text-slate-900 truncate">{user?.name || 'Admin'}</div>
+              <button onClick={logout} className="text-[9px] text-slate-500 hover:text-slate-900">退出登录</button>
             </div>
           </div>
         </div>
