@@ -52,10 +52,19 @@ function serveApp(request, response) {
   return true
 }
 
+function serveRecorderSdk(request, response) {
+  if (request.method !== 'GET' || request.url?.split('?')[0] !== '/insightux-recorder.js') return false
+  const sdkPath = path.join(distDir, 'insightux-recorder.js')
+  if (!existsSync(sdkPath)) return false
+  serveFile(response, sdkPath)
+  return true
+}
+
 const server = createServer(async (request, response) => {
   try {
     if (await routeApi(request, response)) return
-    if (siteStorage.serve(request, response, store)) return
+    if (serveRecorderSdk(request, response)) return
+    if (await siteStorage.serve(request, response, store)) return
     if (serveApp(request, response)) return
     response.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' })
     response.end(JSON.stringify({ error: { code: 'NOT_FOUND', message: '接口不存在' } }))

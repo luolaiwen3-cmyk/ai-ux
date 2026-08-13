@@ -4,7 +4,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-COPY index.html postcss.config.js tailwind.config.js vite.config.js ./
+COPY index.html postcss.config.js tailwind.config.js vite.config.js vite.sdk.config.js ./
 COPY src ./src
 RUN npm run build && npm prune --omit=dev
 

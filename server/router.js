@@ -221,6 +221,38 @@ export function createApiRouter({ store, config, siteStorage = null }) {
       return true
     }
 
+    const validateUrlMatch = pathname.match(/^\/api\/tasks\/([^/]+)\/validate-url$/)
+    if (request.method === 'POST' && validateUrlMatch) {
+      const id = decodeURIComponent(validateUrlMatch[1])
+      const task = store.getTask(id)
+      if (!task) throw new HttpError(404, '任务不存在', 'TASK_NOT_FOUND')
+      if (task.targetType !== 'url' || !task.targetUrl) {
+        throw new HttpError(409, '只有 URL 类型任务可以执行连接验证', 'INVALID_TARGET_TYPE')
+      }
+      const body = await readJson(request, 16 * 1024)
+      let targetOrigin
+      try {
+        targetOrigin = new URL(task.targetUrl).origin
+      } catch {
+        throw new HttpError(400, '测试网页 URL 无效', 'VALIDATION_ERROR')
+      }
+      if (body.origin !== targetOrigin || body.sdkVersion !== '1.0.0') {
+        throw new HttpError(400, '录制 SDK 握手信息与任务 URL 不匹配', 'RECORDER_HANDSHAKE_INVALID')
+      }
+      if (config.isProduction && !task.targetUrl.startsWith('https://')) {
+        throw new HttpError(400, '生产环境 URL 测试仅允许 HTTPS 网页', 'HTTPS_REQUIRED')
+      }
+      const appOrigin = new URL(config.publicAppUrl).origin
+      if (targetOrigin === appOrigin) {
+        throw new HttpError(400, 'URL 测试不能指向 InsightUX 自身地址', 'SELF_TARGET_NOT_ALLOWED')
+      }
+      const updated = store.updateTask(id, {
+        targetStatus: 'ready', targetOrigin, validatedAt: new Date().toISOString()
+      })
+      sendJson(response, 200, { task: updated })
+      return true
+    }
+
     const taskMatch = pathname.match(/^\/api\/tasks\/([^/]+)$/)
     if (taskMatch) {
       const id = decodeURIComponent(taskMatch[1])

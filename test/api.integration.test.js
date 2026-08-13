@@ -116,3 +116,35 @@ test('API 完成登录、任务、匿名会话、诊断和分享报告主链路'
     await api.close()
   }
 })
+
+test('URL 任务必须完成匹配的 SDK 握手才能发布', async () => {
+  const api = await startTestApi()
+  try {
+    const login = await jsonRequest(`${api.baseUrl}/api/auth/login`, {
+      method: 'POST', body: JSON.stringify({ password: 'test-password' })
+    })
+    const cookie = login.response.headers.get('set-cookie').split(';')[0]
+    const created = await jsonRequest(`${api.baseUrl}/api/tasks`, {
+      method: 'POST', headers: { Cookie: cookie },
+      body: JSON.stringify({
+        name: 'URL 任务', description: '', steps: ['完成操作'], status: 'draft',
+        targetType: 'url', targetUrl: 'https://example.test/demo'
+      })
+    })
+    const task = created.data.task
+    const invalid = await jsonRequest(`${api.baseUrl}/api/tasks/${task.id}/validate-url`, {
+      method: 'POST', headers: { Cookie: cookie },
+      body: JSON.stringify({ origin: 'https://wrong.test', sdkVersion: '1.0.0' })
+    })
+    assert.equal(invalid.response.status, 400)
+
+    const valid = await jsonRequest(`${api.baseUrl}/api/tasks/${task.id}/validate-url`, {
+      method: 'POST', headers: { Cookie: cookie },
+      body: JSON.stringify({ origin: 'https://example.test', sdkVersion: '1.0.0' })
+    })
+    assert.equal(valid.data.task.targetStatus, 'ready')
+    assert.equal(valid.data.task.targetOrigin, 'https://example.test')
+  } finally {
+    await api.close()
+  }
+})

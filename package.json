@@ -7,10 +7,11 @@
     "node": ">=22.5.0"
   },
   "scripts": {
-    "dev": "node scripts/dev.mjs",
+    "dev": "npm run build:sdk && node scripts/dev.mjs",
     "dev:web": "vite",
     "dev:api": "node server/index.js --dev",
-    "build": "vite build",
+    "build": "vite build && npm run build:sdk",
+    "build:sdk": "vite build --config vite.sdk.config.js",
     "preview": "vite preview",
     "start": "node server/index.js",
     "test": "node --test",

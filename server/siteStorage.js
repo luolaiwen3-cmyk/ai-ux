@@ -1,5 +1,5 @@
 import { createReadStream, createWriteStream, existsSync, statSync } from 'node:fs'
-import { mkdir, mkdtemp, rename, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rename, rm } from 'node:fs/promises'
 import path from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { pipeline } from 'node:stream/promises'
@@ -173,7 +173,7 @@ export function createSiteStorage(rootDir) {
       }
     },
 
-    serve(request, response, store) {
+    async serve(request, response, store) {
       const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`)
       const match = url.pathname.match(/^\/test-content\/([^/]+)(?:\/(.*))?$/)
       if (request.method !== 'GET' || !match) return false
@@ -199,9 +199,14 @@ export function createSiteStorage(rootDir) {
         'X-Content-Type-Options': 'nosniff',
         'Referrer-Policy': 'no-referrer'
       })
-      createReadStream(candidate).pipe(response)
+      if (extension === '.html') {
+        const source = await readFile(candidate, 'utf8')
+        const loader = `<script src="/insightux-recorder.js" data-task-id="${task.id}"></script>`
+        response.end(source.includes('</head>') ? source.replace('</head>', `${loader}</head>`) : `${loader}${source}`)
+      } else {
+        createReadStream(candidate).pipe(response)
+      }
       return true
     }
   }
 }
-

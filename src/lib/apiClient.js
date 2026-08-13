@@ -89,7 +89,8 @@ export const api = {
     list: () => request('/api/tasks'),
     create: (input) => request('/api/tasks', { method: 'POST', body: input }),
     update: (id, input) => request(`/api/tasks/${encodeURIComponent(id)}`, { method: 'PATCH', body: input }),
-    uploadSite: (id, file) => uploadZip(`/api/tasks/${encodeURIComponent(id)}/site`, file)
+    uploadSite: (id, file) => uploadZip(`/api/tasks/${encodeURIComponent(id)}/site`, file),
+    validateUrl: (id, input) => request(`/api/tasks/${encodeURIComponent(id)}/validate-url`, { method: 'POST', body: input })
   },
 
   sessions: {
