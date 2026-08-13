@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
 import { createOpaqueToken, hashToken } from './auth.js'
 import { HttpError } from './http.js'
+import { analyzeSession } from './metrics.js'
 
 const nowIso = () => new Date().toISOString()
 
@@ -42,7 +43,7 @@ const mapSessionSummary = (row) => row && ({
   hasFace: Number(row.frame_count || 0) > 0,
   lastEmotion: parseJson(row.last_emotion_json, null),
   diagnosisStatus: row.diagnosis_status || null,
-  severity: row.severity || null,
+  severity: row.severity || parseJson(row.metrics_json, {}).severity || null,
   consentAt: row.consent_at,
   startedAt: row.started_at,
   completedAt: row.completed_at,
@@ -246,6 +247,7 @@ export function createStore(databasePath) {
       const events = Array.isArray(input.events) ? input.events : []
       const frames = Array.isArray(input.faceFrames) ? input.faceFrames : []
       const lastEmotion = [...frames].reverse().find((frame) => frame?.emotion)?.emotion || null
+      const metrics = analyzeSession(events, frames, input.couponDecision)
       const timestamp = nowIso()
       database.prepare(`
         UPDATE sessions SET
@@ -258,8 +260,8 @@ export function createStore(databasePath) {
         input.couponDecision,
         JSON.stringify(events),
         JSON.stringify(frames),
-        JSON.stringify(input.metrics || {}),
-        Math.max(0, Math.round(Number(input.duration) || 0)),
+        JSON.stringify({ ...metrics, taskResult: input.metrics || {} }),
+        metrics.totalDurationMs || Math.max(0, Math.round(Number(input.duration) || 0)),
         events.length,
         frames.length,
         lastEmotion ? JSON.stringify(lastEmotion) : null,
@@ -301,6 +303,37 @@ export function createStore(databasePath) {
         events: parseJson(row.rrweb_events_json, []),
         faceFrames: parseJson(row.face_frames_json, []),
         metrics: parseJson(row.metrics_json, {})
+      }
+    },
+
+    getDashboardStats() {
+      const sessions = store.listSessions()
+      const completed = sessions.filter((session) => session.status === 'completed')
+      const diagnosed = completed.filter((session) => session.severity)
+      const p0Count = diagnosed.filter((session) => session.severity === 'P0').length
+      const issueCount = diagnosed.filter((session) => session.severity !== 'P2').length
+      const trend = new Map()
+      completed.forEach((session) => {
+        const day = session.completedAt?.slice(5, 10) || session.createdAt.slice(5, 10)
+        const current = trend.get(day) || { day, sessions: 0, issues: 0 }
+        current.sessions += 1
+        if (session.severity === 'P0' || session.severity === 'P1') current.issues += 1
+        trend.set(day, current)
+      })
+
+      return {
+        totalSessions: sessions.length,
+        completedSessions: completed.length,
+        p0Count,
+        totalIssues: issueCount,
+        sessionsWithFace: sessions.filter((session) => session.hasFace).length,
+        trendData: [...trend.values()].sort((left, right) => left.day.localeCompare(right.day)),
+        issueDist: [
+          { type: '高认知压力', count: p0Count },
+          { type: '操作犹豫', count: diagnosed.filter((session) => session.severity === 'P1').length },
+          { type: '流程顺畅', count: diagnosed.filter((session) => session.severity === 'P2').length }
+        ],
+        recentSessions: sessions.slice(0, 5)
       }
     }
   }

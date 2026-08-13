@@ -36,7 +36,9 @@ test('任务 Token 可以创建并完成唯一会话', () => {
     assert.equal(completed.duration, 3200)
     assert.equal(completed.eventCount, 2)
     assert.equal(completed.frameCount, 1)
-    assert.deepEqual(completed.metrics, { totalClicks: 1 })
+    assert.equal(completed.metrics.totalDurationMs, 3200)
+    assert.equal(completed.metrics.finalDecision, 'applied')
+    assert.deepEqual(completed.metrics.taskResult, { totalClicks: 1 })
   } finally {
     store.close()
   }

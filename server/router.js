@@ -144,7 +144,7 @@ export function createApiRouter({ store, config }) {
       return true
     }
 
-    if (pathname.startsWith('/api/tasks') || pathname.startsWith('/api/sessions')) {
+    if (pathname.startsWith('/api/tasks') || pathname.startsWith('/api/sessions') || pathname.startsWith('/api/dashboard')) {
       requireAdmin(request, config)
     }
 
@@ -180,6 +180,11 @@ export function createApiRouter({ store, config }) {
       if (status && !SESSION_STATUSES.has(status)) throw new HttpError(400, '会话状态无效', 'VALIDATION_ERROR')
       const sort = url.searchParams.get('sort') === 'asc' ? 'asc' : 'desc'
       sendJson(response, 200, { sessions: store.listSessions({ status, sort }) })
+      return true
+    }
+
+    if (request.method === 'GET' && pathname === '/api/dashboard') {
+      sendJson(response, 200, { stats: store.getDashboardStats() })
       return true
     }
 
