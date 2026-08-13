@@ -16,6 +16,12 @@ import {
  * 认知压力折线图 —— 带当前时间指示器
  */
 export default function StressChart({ data, currentTime, duration }) {
+  const peak = useMemo(() => (data || []).reduce((highest, point) => point.stress > highest.stress ? point : highest, { t: 0, stress: 0 }), [data])
+  const ticks = useMemo(() => {
+    const step = Math.max(1, duration / 4)
+    return [0, step, step * 2, step * 3, duration].map((value) => Number(value.toFixed(1)))
+  }, [duration])
+
   return (
     <div className="glass rounded-xl p-4 shrink-0">
       <div className="flex items-center justify-between mb-2">
@@ -46,9 +52,9 @@ export default function StressChart({ data, currentTime, duration }) {
               dataKey="t"
               type="number"
               domain={[0, duration]}
-              ticks={[0, 5, 10, 14.5, 15, 20]}
+              ticks={ticks}
               tick={{ fill: '#374151', fontSize: 9, fontFamily: 'JetBrains Mono' }}
-              tickFormatter={(v) => (v === 14.5 ? '14.5*' : `${v}s`)}
+              tickFormatter={(v) => `${v}s`}
               stroke="#d1d5db"
             />
             <YAxis
@@ -79,9 +85,8 @@ export default function StressChart({ data, currentTime, duration }) {
               strokeDasharray="2 2"
               strokeOpacity={0.6}
             />
-            {/* 14.5s 峰值标记 */}
-            <ReferenceDot x={14.5} y={0.94} r={5} fill="#FF4D6A" fillOpacity="0.9" stroke="#fff" strokeWidth={1} />
-            <ReferenceDot x={14.5} y={0.94} r={11} fill="#FF4D6A" fillOpacity="0.15" stroke="none" />
+            {peak.stress > 0 && <ReferenceDot x={peak.t} y={peak.stress} r={5} fill="#FF4D6A" fillOpacity="0.9" stroke="#fff" strokeWidth={1} />}
+            {peak.stress > 0 && <ReferenceDot x={peak.t} y={peak.stress} r={11} fill="#FF4D6A" fillOpacity="0.15" stroke="none" />}
             <Area type="monotone" dataKey="stress" stroke="none" fill="url(#stressFill)" />
             <Line
               type="monotone"

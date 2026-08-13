@@ -6,10 +6,8 @@ import StressChart from '../../components/researcher/StressChart.jsx'
 import Timeline from '../../components/researcher/Timeline.jsx'
 import BehaviorCards from '../../components/researcher/BehaviorCards.jsx'
 import DiagnosisPanel from '../../components/researcher/DiagnosisPanel.jsx'
-import { mouseTrail, clickEvents, timelineEvents, stressData, sessionMeta } from '../../data/sessionData.js'
-import { loadFromStorage, hasStoredSession } from '../../lib/rrwebRecorder.js'
-import { loadFrames, hasFaceData } from '../../lib/mediaPipeTracker.js'
-import { getSessionMetrics, getStressData } from '../../lib/sessionDataService.js'
+import { mouseTrail, clickEvents, timelineEvents } from '../../data/sessionData.js'
+import { api } from '../../lib/apiClient.js'
 
 /**
  * A3 单会话深度分析 —— 核心页面
@@ -21,42 +19,34 @@ export default function SessionDetailPage() {
   const [playing, setPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [playbackSpeed, setPlaybackSpeed] = useState(1)
-  const [useRealData, setUseRealData] = useState(false)
-  const [faceFrames, setFaceFrames] = useState([])
-  const [hasFace, setHasFace] = useState(false)
-  const [metrics, setMetrics] = useState(null)
-  const [realStressData, setRealStressData] = useState(null)
-  const duration = 20
+  const [session, setSession] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const duration = Math.max(0.1, (session?.duration || session?.metrics?.totalDurationMs || 0) / 1000)
+  const faceFrames = session?.faceFrames || []
+  const hasFace = faceFrames.length > 0
+  const metrics = session?.metrics || null
+  const realStressData = metrics?.stressData?.map((point) => ({ t: point.t / 1000, stress: point.stress })) || []
   const rafRef = useRef(null)
   const lastTimeRef = useRef(null)
   const playerDrivingRef = useRef(false) // 标记是否由 rrweb player 驱动时间
 
   // 加载真实数据
   useEffect(() => {
-    // 检查是否有 rrweb 录制数据
-    const hasData = hasStoredSession(id) || hasStoredSession()
-    setUseRealData(hasData)
-    console.log('[SessionDetail] 会话ID:', id, '有数据:', hasData)
-
-    // 加载行为指标
-    const m = getSessionMetrics(id)
-    if (m) {
-      setMetrics(m)
-    }
-
-    // 加载面部帧数据
-    const frames = loadFrames(id)
-    if (frames && frames.length > 0) {
-      setFaceFrames(frames)
-      setHasFace(true)
-      console.log('[SessionDetail] 面部帧数:', frames.length)
-    }
-
-    // 生成压力曲线（从 MediaPipe 情绪数据）
-    const stress = getStressData(id)
-    if (stress) {
-      setRealStressData(stress)
-    }
+    let active = true
+    setLoading(true)
+    setError('')
+    api.sessions.get(id)
+      .then((result) => {
+        if (active) setSession(result.session)
+      })
+      .catch((requestError) => {
+        if (active) setError(requestError.message)
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => { active = false }
   }, [id])
 
   // rrweb player 驱动时间更新（播放时由 replayer 回调）
@@ -113,6 +103,19 @@ export default function SessionDetailPage() {
     if (playing) setPlaying(false)
   }
 
+  if (loading) return <AnalystLayout><div className="p-12 text-center text-sm text-slate-500">正在加载会话数据…</div></AnalystLayout>
+  if (!session || error) return <AnalystLayout><div className="p-12 text-center"><div className="text-sm text-red-600">{error || '会话不存在'}</div><Link to="/sessions" className="inline-block mt-4 text-xs text-cyan-glow">返回会话列表</Link></div></AnalystLayout>
+
+  const displayMetrics = metrics && {
+    totalDuration: `${(metrics.totalDurationMs / 1000).toFixed(1)}s`,
+    timeToFirstClick: `${(metrics.firstClickMs / 1000).toFixed(1)}s`,
+    totalClicks: metrics.totalClicks,
+    hesitationTime: `${(metrics.hesitationMs / 1000).toFixed(1)}s`,
+    mouseDistance: `${Number(metrics.mouseDistance).toLocaleString()}px`,
+    backAndForth: metrics.backAndForth,
+    finalDecision: metrics.finalDecision
+  }
+
   return (
     <AnalystLayout>
       <div className="p-4 flex flex-col gap-4 h-[calc(100vh-0px)] min-h-0">
@@ -124,21 +127,21 @@ export default function SessionDetailPage() {
             </Link>
             <div>
               <h1 className="text-[14px] font-semibold text-slate-100">
-                会话 {id || sessionMeta.id}
+                会话 {session.participantCode}
               </h1>
               <p className="text-[10px] text-slate-500 font-mono">
-                {sessionMeta.participant} · {sessionMeta.task}
+                {session.taskName} · {session.id}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {useRealData && (
+            {session.events.length > 0 && (
               <span className="px-2 py-0.5 rounded text-[9px] font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
                 rrweb 真实录制
               </span>
             )}
             <Link
-              to={`/report/${id || sessionMeta.id}`}
+              to={`/report/${id}`}
               className="px-3 py-1.5 rounded-lg bg-cyan-glow/15 border border-cyan-glow/25 text-[11px] font-mono text-cyan-glow hover:bg-cyan-glow/25 transition-colors"
             >
               📄 查看报告
@@ -155,15 +158,17 @@ export default function SessionDetailPage() {
               mouseTrail={mouseTrail}
               clickEvents={clickEvents}
               duration={duration}
-              sessionId={id || sessionMeta.id}
+              sessionId={id}
               playing={playing}
               onTimeUpdate={handlePlayerTimeUpdate}
+              recordedEvents={session.events}
+              recordedFaceFrames={faceFrames}
             />
             <Timeline
               currentTime={currentTime}
               duration={duration}
               events={timelineEvents}
-              stressData={realStressData || stressData}
+              stressData={realStressData}
               onScrub={handleScrub}
               playing={playing}
               onPlayPause={handlePlayPause}
@@ -174,10 +179,10 @@ export default function SessionDetailPage() {
 
           {/* 右侧 40%：数据 + 报告 */}
           <div className="lg:col-span-5 flex flex-col gap-4 min-h-0 overflow-y-auto">
-            <BehaviorCards stats={metrics} meta={{ id, task: '电商结算页优惠券弹窗测试' }} />
+            <BehaviorCards stats={displayMetrics} meta={{ id: session.participantCode, task: session.taskName }} />
             {hasFace && <FaceDataCard frames={faceFrames} currentTime={currentTime} />}
-            <StressChart data={realStressData || stressData} currentTime={currentTime} duration={duration} />
-            <DiagnosisPanel metrics={metrics} stressData={realStressData || stressData} hasFace={hasFace} />
+            <StressChart data={realStressData} currentTime={currentTime} duration={duration} />
+            <DiagnosisPanel metrics={displayMetrics} stressData={realStressData} hasFace={hasFace} />
           </div>
         </div>
       </div>

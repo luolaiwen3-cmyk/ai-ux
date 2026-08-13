@@ -9,7 +9,7 @@ import { loadFrames } from '../../lib/mediaPipeTracker.js'
  * 优先使用 rrweb 真实录制数据回放，降级到 mock 轨迹
  * + MediaPipe 面部视频帧回放
  */
-export default function ReplayViewport({ currentTime, mouseTrail, clickEvents, duration, sessionId, playing, onTimeUpdate }) {
+export default function ReplayViewport({ currentTime, mouseTrail, clickEvents, duration, sessionId, playing, onTimeUpdate, recordedEvents, recordedFaceFrames }) {
   const playerRef = useRef(null)
   const [hasRealData, setHasRealData] = useState(false)
   const [realEvents, setRealEvents] = useState([])
@@ -19,11 +19,11 @@ export default function ReplayViewport({ currentTime, mouseTrail, clickEvents, d
 
   // 加载面部帧数据
   useEffect(() => {
-    const frames = loadFrames(sessionId)
+    const frames = recordedFaceFrames || loadFrames(sessionId)
     if (frames && frames.length > 0) {
       setFaceFrames(frames)
     }
-  }, [sessionId])
+  }, [sessionId, recordedFaceFrames])
 
   // 获取当前时间点的面部帧
   const currentFaceFrame = useMemo(() => {
@@ -45,7 +45,7 @@ export default function ReplayViewport({ currentTime, mouseTrail, clickEvents, d
 
   // 检查是否有真实录制数据（从 localStorage 读取）
   useEffect(() => {
-    const events = loadFromStorage(sessionId)
+    const events = recordedEvents || loadFromStorage(sessionId)
     if (events && events.length > 0) {
       // 只要有事件就认为是真实数据（不再严格检查首事件类型）
       setRealEvents(events)
@@ -54,7 +54,7 @@ export default function ReplayViewport({ currentTime, mouseTrail, clickEvents, d
     } else {
       console.log('[ReplayViewport] 无真实数据，使用 mock')
     }
-  }, [sessionId])
+  }, [sessionId, recordedEvents])
 
   // 播放控制：播放时用 play()，暂停/拖拽时用 goto()
   // 避免每帧调用 goto() 导致 DOM 重建跟不上和 AbortError
