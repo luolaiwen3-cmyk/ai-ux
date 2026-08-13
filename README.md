@@ -26,15 +26,16 @@ React + Vite (HashRouter)
         ├── MediaPipe FaceLandmarker
         │
         ▼
-Node HTTP API ─── SQLite
-        │             ├── Task
-        │             ├── Session
-        │             └── Diagnosis / Share Token
+Fastify `/api/v1`
+        │
+        ├── Route Schema / Service / Repository
+        ├── better-sqlite3 ─── SQLite migrations
+        └── ZIP / 静态测试网站
         ▼
 DashScope OpenAI-compatible API (可选 Qwen3-VL)
 ```
 
-Node 服务在生产环境同时提供 API 和构建后的前端静态资源。业务数据以 SQLite 为唯一真相来源；浏览器存储只在提交失败时充当临时缓冲，服务器确认成功后会清除。
+Fastify 在生产环境同时提供版本化 API 和构建后的前端静态资源。路由使用 JSON Schema 校验，业务规则位于 Service，SQL 集中在 Repository，数据库结构由编号 migration 管理。SQLite 是业务数据的唯一真相来源；浏览器存储只在提交失败时充当临时缓冲，服务器确认成功后会清除。
 
 ## 本地开发
 
@@ -49,7 +50,8 @@ npm run dev
 开发地址：
 
 - 前端：<http://localhost:5173>
-- API：<http://localhost:8787/api/health>
+- API：<http://localhost:8787/api/v1/health>
+- OpenAPI 文档：<http://localhost:8787/docs>
 - 内置演示任务：<http://localhost:5173/#/join/abc123>
 
 `.env.example` 中的默认值仅供本地开发。分析端打开 <http://localhost:5173/#/>，默认开发密码为 `change-me`（复制示例配置后）；请在首次运行前修改。
@@ -89,7 +91,7 @@ npm run test:e2e
 npm run build
 ```
 
-测试覆盖确定性指标、规则诊断、SQLite 数据迁移与约束、安全 ZIP 解压、录制 SDK 协议，以及从网页上传/URL 验证、正式会话、试跑隔离、回放、诊断到分享报告的 API 和浏览器完整链路。端到端测试默认使用本机 Google Chrome。
+测试覆盖确定性指标、规则诊断、版本化 SQLite migration 与约束、安全 ZIP 解压、录制 SDK 协议，以及从网页上传/URL 验证、正式会话、试跑隔离、回放、诊断到分享报告的 API 和浏览器完整链路。端到端测试默认使用本机 Google Chrome。
 
 ## 生产运行
 
@@ -103,7 +105,7 @@ npm run build
 NODE_ENV=production npm start
 ```
 
-应用默认监听 <http://localhost:8787>，SQLite 默认写入 `data/insightux.db`。生产模式会拒绝缺失管理员密码或长度不足 32 字符的会话密钥。
+应用默认监听 <http://localhost:8787>，SQLite 默认写入 `data/data.db`。旧版 `data/insightux.db` 不会自动迁移或读取。生产模式会拒绝缺失管理员密码或长度不足 32 字符的会话密钥，并且默认不创建演示任务。
 
 ### Docker Compose
 
@@ -145,7 +147,7 @@ docker compose up -d --build
 
 ```text
 src/                  React 页面、组件和浏览器采集
-server/               HTTP API、鉴权、SQLite、指标与诊断
+server/               Fastify API、Service、Repository、SQLite migrations 与诊断
 test/                 单元测试和 API 集成测试
 docs/                 产品规范与实施记录
 .github/workflows/    CI
