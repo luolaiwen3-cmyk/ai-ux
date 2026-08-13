@@ -49,3 +49,8 @@ export const sessionsApi = {
   faceFrames: (id) => apiRequest(`/sessions/${id}/face-frames`),
   remove: (id) => apiRequest(`/sessions/${id}`, { method: 'DELETE' })
 }
+
+export const reportsApi = {
+  get: (sessionId) => apiRequest(`/sessions/${sessionId}/report`),
+  generate: (sessionId) => apiRequest(`/sessions/${sessionId}/report`, { method: 'POST' })
+}

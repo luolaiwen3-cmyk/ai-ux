@@ -151,7 +151,7 @@ export default function SessionDetailPage() {
             <BehaviorCards stats={{ ...behaviorStats, totalDuration: `${duration.toFixed(1)}s`, totalClicks: session.event_count }} meta={{ ...sessionMeta, participant: session.participant_id, task: session.task_name }} />
             {faceFrames.length > 0 && <FaceDataCard frames={faceFrames} currentTime={currentTime} />}
             <StressChart data={stressData} currentTime={currentTime} duration={duration} />
-            <DiagnosisPanel />
+            <DiagnosisPanel sessionId={id} initialHasReport={session.has_report} />
           </div>
         </div>
       </div>

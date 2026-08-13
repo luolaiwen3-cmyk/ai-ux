@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import AnalystLayout from '../../components/shared/AnalystLayout.jsx'
+import { reportsApi } from '../../api/client.js'
 
 /**
  * A4 报告导出 —— 诊断报告展示 + 导出 PDF / 分享链接
@@ -8,6 +9,12 @@ import AnalystLayout from '../../components/shared/AnalystLayout.jsx'
 export default function ReportPage() {
   const { id } = useParams()
   const [copied, setCopied] = useState(false)
+  const [report, setReport] = useState(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    reportsApi.get(id).then(setReport).catch((err) => setError(err.message))
+  }, [id])
 
   const handleExport = () => {
     window.print()
@@ -26,6 +33,7 @@ export default function ReportPage() {
   return (
     <AnalystLayout>
       <div className="report-page p-6">
+        {!report && <div className="max-w-2xl mx-auto mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">{error || '正在加载报告…'}</div>}
         {/* 页头 */}
         <div className="print-hidden flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
@@ -69,7 +77,7 @@ export default function ReportPage() {
                 用户体验缺陷诊断报告
               </h2>
               <div className="text-[11px] text-slate-500 mt-2 font-mono">
-                会话 {id} · 生成于 2026-08-12 13:25:30
+                会话 {id} · {report ? `生成于 ${new Date(report.generated_at).toLocaleString('zh-CN')}` : '等待报告数据'}
               </div>
             </div>
 
@@ -77,20 +85,17 @@ export default function ReportPage() {
             <div className="py-6 border-b border-cyan-glow/10">
               <div className="flex items-center gap-2 mb-3">
                 <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-danger/15 text-danger border border-danger/30">
-                  P0 紧急
+                  {report?.content.severity || 'P0'} 紧急
                 </span>
                 <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-warn/10 text-warn border border-warn/25">
-                  置信度 0.94
+                  置信度 {report?.content.confidence || 0.94}
                 </span>
               </div>
               <h3 className="text-[15px] font-semibold text-slate-100 mb-2">
-                优惠券弹窗双按钮文案歧义导致决策困难
+                {report?.content.title || '优惠券弹窗双按钮文案歧义导致决策困难'}
               </h3>
               <p className="text-[12px] text-slate-400 leading-relaxed">
-                被试在优惠券弹窗出现后产生显著认知压力（峰值 0.94），
-                在「稍后再用」与「立即使用」两个按钮间反复徘徊 11.5 秒，
-                最终完成决策。双按钮视觉权重接近、文案未明确传递后果，
-                是导致决策犹豫的核心原因。
+                {report?.content.summary || '请先从会话详情触发智能诊断。'}
               </p>
             </div>
 
@@ -100,7 +105,7 @@ export default function ReportPage() {
                 KEY METRICS · 关键指标
               </div>
               <div className="grid grid-cols-3 gap-3">
-                <MetricBox label="总停留时长" value="20.0s" color="text-cyan-glow" />
+                <MetricBox label="总停留时长" value={report?.content.metrics?.duration || '20.0s'} color="text-cyan-glow" />
                 <MetricBox label="决策犹豫" value="11.5s" color="text-danger" />
                 <MetricBox label="认知峰值" value="0.94" color="text-danger" />
                 <MetricBox label="来回徘徊" value="3 次" color="text-warn" />

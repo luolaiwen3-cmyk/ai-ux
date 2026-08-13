@@ -1,19 +1,26 @@
 import React, { useState } from 'react'
+import { reportsApi } from '../../api/client.js'
 
 /**
  * Agent 智能诊断报告面板 —— Qwen3-VL 多模态推理结果
  */
-export default function DiagnosisPanel() {
+export default function DiagnosisPanel({ sessionId, initialHasReport = false }) {
   const [diagnosing, setDiagnosing] = useState(false)
-  const [diagnosed, setDiagnosed] = useState(false)
+  const [diagnosed, setDiagnosed] = useState(initialHasReport)
+  const [error, setError] = useState('')
 
-  const handleDiagnose = () => {
+  const handleDiagnose = async () => {
     setDiagnosing(true)
-    setDiagnosed(false)
-    setTimeout(() => {
-      setDiagnosing(false)
+    setError('')
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 800))
+      await reportsApi.generate(sessionId)
       setDiagnosed(true)
-    }, 2400)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setDiagnosing(false)
+    }
   }
 
   return (
@@ -41,6 +48,7 @@ export default function DiagnosisPanel() {
           {diagnosing ? '推理中…' : '触发智能诊断'}
         </button>
       </div>
+      {error && <div className="text-[10px] text-red-600">诊断保存失败：{error}</div>}
 
       {/* 内容区 */}
       {!diagnosing && !diagnosed && (
