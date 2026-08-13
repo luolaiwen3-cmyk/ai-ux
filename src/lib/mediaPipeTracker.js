@@ -312,9 +312,10 @@ export const saveFrame = (sessionId, frame) => {
 
     frames.push(simplifiedFrame)
 
-    // 限制最大帧数（20s × 5fps = 100 帧）
-    if (frames.length > 100) {
-      frames = frames.slice(-100)
+    // 与 rrweb 120 秒录制上限对齐：120s × 5fps = 600 帧。
+    // 保留会话起点，避免面部曲线与行为时间轴失去共同时间原点。
+    if (frames.length > 600) {
+      frames = frames.slice(0, 600)
     }
 
     localStorage.setItem(key, JSON.stringify(frames))

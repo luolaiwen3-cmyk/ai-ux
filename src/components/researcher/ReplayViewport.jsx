@@ -9,7 +9,7 @@ import { loadFrames } from '../../lib/mediaPipeTracker.js'
  * 优先使用 rrweb 真实录制数据回放，降级到 mock 轨迹
  * + MediaPipe 面部视频帧回放
  */
-export default function ReplayViewport({ currentTime, mouseTrail, clickEvents, duration, sessionId, playing, onTimeUpdate, recordedEvents, recordedFaceFrames }) {
+export default function ReplayViewport({ currentTime, mouseTrail, clickEvents, duration, sessionId, playing, playbackSpeed = 1, onTimeUpdate, recordedEvents, recordedFaceFrames }) {
   const playerRef = useRef(null)
   const [hasRealData, setHasRealData] = useState(false)
   const [realEvents, setRealEvents] = useState([])
@@ -75,6 +75,12 @@ export default function ReplayViewport({ currentTime, mouseTrail, clickEvents, d
       }
     }
   }, [playing, hasRealData])
+
+  useEffect(() => {
+    if (hasRealData && playerRef.current) {
+      playerRef.current.setSpeed(playbackSpeed)
+    }
+  }, [playbackSpeed, hasRealData])
 
   // 播放时，定期从 replayer 读取当前时间同步给父组件
   useEffect(() => {

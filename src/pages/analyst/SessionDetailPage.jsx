@@ -160,6 +160,7 @@ export default function SessionDetailPage() {
               duration={duration}
               sessionId={id}
               playing={playing}
+              playbackSpeed={playbackSpeed}
               onTimeUpdate={handlePlayerTimeUpdate}
               recordedEvents={session.events}
               recordedFaceFrames={faceFrames}
