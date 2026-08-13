@@ -78,6 +78,8 @@ ZIP 内容保存在 `INSIGHTUX_SITE_DIR`（默认 `./data/task-sites`），Docke
 
 每个已验证任务都可点击“试跑”。试跑完整记录行为和面部数据并可回放，但使用 `T-xxx` 编号，不计入任务会话数、仪表盘或正式会话，也不能生成诊断、报告和分享链接。
 
+外部 URL 的完整接入、响应头、安全协议和排障说明见 [Recorder SDK 接入指南](docs/RECORDER_SDK.md)。
+
 ## 验证
 
 ```bash
