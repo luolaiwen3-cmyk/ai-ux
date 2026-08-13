@@ -12,6 +12,7 @@ export function createRuleDiagnosis(session) {
   const peakStress = Number(metrics.peakStress || 0)
   const backAndForth = Number(metrics.backAndForth || 0)
   const severity = metrics.severity || 'P2'
+  const isCheckout = session.scenario === 'checkout-coupon'
 
   let summary = '任务流程整体顺畅，未发现显著体验阻碍'
   let rootCause = '行为与面部数据未达到高摩擦阈值。'
@@ -20,17 +21,24 @@ export function createRuleDiagnosis(session) {
   if (severity === 'P0') {
     summary = '关键决策节点出现高认知压力与明显犹豫'
     rootCause = `用户累计停顿 ${hesitationSeconds.toFixed(1)} 秒，压力峰值达到 ${(peakStress * 100).toFixed(0)}%，当前选项的后果和主次关系不够清晰。`
-    recommendations = [
+    recommendations = isCheckout ? [
       '将优惠券选择改为单一主操作，并明确展示使用后的实际减免。',
       '降低次要操作的视觉权重，并将“稍后再用”改为可预判后果的文案。',
       '在相同任务上再次测试，比较决策时长和压力峰值。'
+    ] : [
+      '明确关键操作的主次层级，并在操作前说明结果。',
+      '减少同一区域中的竞争性入口和含义相近的行动文案。',
+      '使用相同任务再次测试，比较完成时长、停顿和压力峰值。'
     ]
   } else if (severity === 'P1') {
     summary = '决策步骤存在可感知的交互摩擦'
     rootCause = `检测到 ${backAndForth} 次方向反转和 ${hesitationSeconds.toFixed(1)} 秒停顿，用户需要额外确认选项含义。`
-    recommendations = [
+    recommendations = isCheckout ? [
       '强化推荐选项的视觉层级，并补充简短结果说明。',
       '减少弹窗中的竞争性操作，避免两个按钮使用相近的行动文案。'
+    ] : [
+      '强化主要操作的视觉层级，并补充简短结果说明。',
+      '检查高停顿时段附近的文案、反馈和导航是否清晰。'
     ]
   }
 
@@ -47,12 +55,17 @@ export function createRuleDiagnosis(session) {
       value: session.hasFace ? `${(peakStress * 100).toFixed(0)}%` : severity,
       timestampMs: metrics.peakTimeMs || 0
     },
-    {
+    ...(isCheckout ? [{
       source: 'result',
       label: '最终选择',
       value: decisionLabel[session.couponDecision] || session.couponDecision,
       timestampMs: metrics.totalDurationMs || 0
-    }
+    }] : [{
+      source: 'result',
+      label: '任务完成方式',
+      value: session.result?.completion === 'manual' ? '被试手动确认完成' : '已提交',
+      timestampMs: metrics.totalDurationMs || 0
+    }])
   ]
 
   const confidence = Number(Math.min(0.96, 0.68 + (session.eventCount > 20 ? 0.1 : 0) + (session.hasFace ? 0.12 : 0) + (severity === 'P0' ? 0.04 : 0)).toFixed(2))
@@ -109,7 +122,9 @@ export async function diagnoseSession(session, config) {
   const prompt = `你是 UX 研究分析师。请只基于给定的会话指标和截图诊断，不要臆造界面事实。输出一个 JSON 对象，字段为 severity(P0/P1/P2/NONE)、confidence(0-1)、summary、rootCause、evidence 数组(source,label,value,timestampMs)、recommendations 字符串数组、expectedImpact。\n\n会话数据：${JSON.stringify({
     task: session.taskName,
     participant: session.participantCode,
-    couponDecision: session.couponDecision,
+    scenario: session.scenario,
+    result: session.result,
+    ...(session.scenario === 'checkout-coupon' ? { couponDecision: session.couponDecision } : {}),
     metrics: session.metrics
   })}`
 

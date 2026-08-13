@@ -27,3 +27,11 @@ test('会话指标由实际事件和面部帧确定性计算', () => {
   assert.equal(metrics.severity, 'P0')
   assert.deepEqual(metrics, analyzeSession(events, frames, 'declined'))
 })
+
+test('通用网页指标不会伪造优惠券最终决策', () => {
+  const metrics = analyzeSession([
+    { type: 0, timestamp: 1000 }, { type: 3, timestamp: 2000, data: { type: 2, x: 1, y: 1 } }
+  ], [], { finalDecision: null })
+  assert.equal(metrics.finalDecision, null)
+  assert.equal(metrics.totalClicks, 1)
+})

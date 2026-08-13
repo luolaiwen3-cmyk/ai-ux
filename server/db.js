@@ -41,6 +41,8 @@ const mapSessionSummary = (row) => row && ({
   id: row.id,
   taskId: row.task_id,
   taskName: row.task_name,
+  scenario: row.task_target_type === 'builtin' ? row.task_scenario : 'generic-web',
+  targetType: row.task_target_type || 'builtin',
   participantCode: row.participant_code,
   mode: row.mode || 'participant',
   status: row.status,
@@ -346,8 +348,11 @@ export function createStore(databasePath) {
 
       const events = Array.isArray(input.events) ? input.events : []
       const frames = Array.isArray(input.faceFrames) ? input.faceFrames : []
+      const task = store.getTask(session.task_id)
       const lastEmotion = [...frames].reverse().find((frame) => frame?.emotion)?.emotion || null
-      const metrics = analyzeSession(events, frames, input.couponDecision)
+      const metrics = analyzeSession(events, frames, {
+        finalDecision: task?.targetType === 'builtin' ? input.couponDecision : null
+      })
       const timestamp = nowIso()
       database.prepare(`
         UPDATE sessions SET

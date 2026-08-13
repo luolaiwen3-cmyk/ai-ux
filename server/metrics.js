@@ -1,7 +1,8 @@
 const isIncremental = (event, sourceType) =>
   event?.type === 3 && event?.data?.type === sourceType
 
-export function analyzeSession(events = [], faceFrames = [], couponDecision = 'none') {
+export function analyzeSession(events = [], faceFrames = [], result = 'none') {
+  const finalDecision = typeof result === 'string' ? result : result?.finalDecision ?? null
   const timestamps = events.map((event) => Number(event?.timestamp)).filter(Number.isFinite)
   const firstTimestamp = timestamps.length ? Math.min(...timestamps) : 0
   const lastTimestamp = timestamps.length ? Math.max(...timestamps) : firstTimestamp
@@ -62,7 +63,7 @@ export function analyzeSession(events = [], faceFrames = [], couponDecision = 'n
     hesitationMs,
     mouseDistance: Math.round(mouseDistance),
     backAndForth,
-    finalDecision: couponDecision,
+    finalDecision,
     peakStress: Number(peakStress.toFixed(3)),
     peakTimeMs: Math.round(peakTimeMs),
     severity,

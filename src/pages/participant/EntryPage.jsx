@@ -143,7 +143,7 @@ export default function EntryPage() {
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
             {step === 'intro' && (
               <div className="text-center">
-                <div className="w-16 h-16 rounded-2xl bg-orange-100 flex items-center justify-center mx-auto mb-5 text-3xl">🛍️</div>
+                <div className="w-16 h-16 rounded-2xl bg-orange-100 flex items-center justify-center mx-auto mb-5 text-3xl">{task.targetType === 'builtin' ? '🛍️' : '🧪'}</div>
                 <div className="text-[10px] uppercase tracking-widest text-orange-500 font-semibold mb-2">{task.name}</div>
                 <h1 className="text-xl font-semibold text-slate-900 mb-2">感谢您参与本次用户体验测试</h1>
                 <p className="text-sm text-slate-500 leading-relaxed mb-5">{task.description || '请像日常使用产品一样自然完成下列任务。'}</p>
@@ -223,7 +223,7 @@ export default function EntryPage() {
 }
 
 function ParticipantHeader() {
-  return <header className="bg-white border-b border-slate-200"><div className="max-w-3xl mx-auto px-6 h-14 flex items-center"><div className="text-lg font-bold text-slate-900">Shop<span className="text-orange-500">Demo</span></div><span className="ml-3 text-xs text-slate-400">用户体验测试</span></div></header>
+  return <header className="bg-white border-b border-slate-200"><div className="max-w-3xl mx-auto px-6 h-14 flex items-center"><div className="text-lg font-bold text-slate-900">Insight<span className="text-orange-500">UX</span></div><span className="ml-3 text-xs text-slate-400">用户体验测试</span></div></header>
 }
 
 function ParticipantState({ title, detail, tone }) {

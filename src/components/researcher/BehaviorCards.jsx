@@ -23,7 +23,7 @@ export default function BehaviorCards({ stats, meta }) {
     { label: '总停留时长', value: stats.totalDuration || '-', icon: '⏱', color: 'text-cyan-glow' },
     { label: '首次点击耗时', value: stats.timeToFirstClick || '-', icon: '⌖', color: 'text-cyan-soft' },
     { label: '总点击次数', value: stats.totalClicks || 0, icon: '◉', color: 'text-warn' },
-    { label: '决策犹豫时长', value: stats.hesitationTime || '-', icon: '◌', color: 'text-danger' },
+    { label: '累计停顿时长', value: stats.hesitationTime || '-', icon: '◌', color: 'text-danger' },
     { label: '鼠标移动距离', value: stats.mouseDistance || '-', icon: '↝', color: 'text-cyan-glow' },
     { label: '来回徘徊次数', value: stats.backAndForth || 0, icon: '⟲', color: 'text-danger' }
   ]

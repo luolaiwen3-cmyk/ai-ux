@@ -100,7 +100,7 @@ export default function CalibratePage() {
 
   return (
     <div className="min-h-screen bg-[#F5F5F7] flex flex-col">
-      <header className="bg-white border-b border-slate-200"><div className="max-w-3xl mx-auto px-6 h-14 flex items-center"><div className="text-lg font-bold text-slate-900">Shop<span className="text-orange-500">Demo</span></div><span className="ml-3 text-xs text-slate-400">面部校准</span></div></header>
+      <header className="bg-white border-b border-slate-200"><div className="max-w-3xl mx-auto px-6 h-14 flex items-center"><div className="text-lg font-bold text-slate-900">Insight<span className="text-orange-500">UX</span></div><span className="ml-3 text-xs text-slate-400">面部校准</span></div></header>
       <main className="flex-1 flex items-center justify-center px-6 py-10">
         <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
           <div className="relative w-64 h-48 mx-auto rounded-xl overflow-hidden bg-slate-900 mb-6">

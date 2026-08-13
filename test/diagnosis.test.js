@@ -35,3 +35,13 @@ test('未配置 Qwen 时明确使用本地规则引擎', async () => {
   assert.equal(diagnosis.model, 'insightux-rules-v1')
   assert.equal(diagnosis.fallbackReason, null)
 })
+
+test('通用网页诊断不输出优惠券专属建议', () => {
+  const diagnosis = createRuleDiagnosis({
+    ...session,
+    scenario: 'generic-web', couponDecision: 'none', result: { completion: 'manual' },
+    metrics: { ...session.metrics, severity: 'P0' }
+  })
+  assert.equal(diagnosis.evidence.at(-1).label, '任务完成方式')
+  assert.equal(diagnosis.recommendations.some((item) => item.includes('优惠券')), false)
+})
