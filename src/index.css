@@ -205,7 +205,8 @@ body {
 }
 
 .analyst-theme input,
-.analyst-theme select {
+.analyst-theme select,
+.analyst-theme textarea {
   background: #ffffff !important;
   border-color: #d1d5db !important;
   color: #111827 !important;
@@ -213,6 +214,20 @@ body {
 
 .analyst-theme input::placeholder {
   color: #9ca3af !important;
+}
+
+@layer components {
+  .primary-button {
+    @apply flex-1 w-full py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold text-sm transition-colors;
+  }
+
+  .secondary-button {
+    @apply flex-1 w-full py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm transition-colors;
+  }
+
+  .form-control {
+    @apply w-full px-3 py-2 rounded-lg bg-white border border-slate-300 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-500;
+  }
 }
 
 .analyst-theme .text-gradient {
