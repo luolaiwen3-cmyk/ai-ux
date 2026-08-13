@@ -228,29 +228,6 @@ export const estimateEmotion = (blendshapes) => {
   }
 }
 
-// 视频截图间隔（每 1000ms 截一帧用于回放）
-let lastSnapshotTime = 0
-const SNAPSHOT_INTERVAL = 1000
-
-/**
- * 从视频元素截取缩略图
- * @param {HTMLVideoElement} video
- * @returns {string} base64 图片 (低分辨率)
- */
-const captureSnapshot = (video) => {
-  if (!video || video.readyState < 2) return null
-  try {
-    const canvas = document.createElement('canvas')
-    canvas.width = 160
-    canvas.height = 120
-    const ctx = canvas.getContext('2d')
-    ctx.drawImage(video, 0, 0, 160, 120)
-    return canvas.toDataURL('image/jpeg', 0.5)
-  } catch {
-    return null
-  }
-}
-
 /**
  * 保存面部帧数据到 localStorage
  * @param {string} sessionId - 会话 ID
@@ -264,20 +241,12 @@ export const saveFrame = (sessionId, frame) => {
       frames = JSON.parse(localStorage.getItem(key) || '[]')
     } catch { frames = [] }
 
-    const now = Date.now()
     const simplifiedFrame = {
       t: frame.timestamp,
       emotion: frame.emotion,
       keyPoints: frame.landmarks ? getKeypoints(frame.landmarks) : null,
       faceDetected: frame.faceDetected,
-      // 低频存储视频截图（1fps）
-      snapshot: null
-    }
-
-    // 每秒截一帧视频画面
-    if (now - lastSnapshotTime > SNAPSHOT_INTERVAL && videoElement) {
-      lastSnapshotTime = now
-      simplifiedFrame.snapshot = captureSnapshot(videoElement)
+      // 仅保存派生特征，不保存原始视频或截图。
     }
 
     frames.push(simplifiedFrame)

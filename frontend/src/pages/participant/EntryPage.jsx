@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
+import { sessionsApi, tasksApi } from '../../api/client.js'
 
 /**
  * P1 入口页 —— 测试人员通过链接进入后的第一个页面
@@ -9,6 +10,9 @@ import { useNavigate } from 'react-router-dom'
  */
 export default function EntryPage() {
   const navigate = useNavigate()
+  const { token } = useParams()
+  const [task, setTask] = useState(null)
+  const [taskError, setTaskError] = useState('')
   const [step, setStep] = useState('intro') // intro | consent | checking | ready | error
   const [checks, setChecks] = useState({
     camera: 'pending',
@@ -17,6 +21,10 @@ export default function EntryPage() {
   })
   const videoRef = useRef(null)
   const streamRef = useRef(null)
+
+  useEffect(() => {
+    tasksApi.getPublic(token).then(setTask).catch((error) => setTaskError(error.message))
+  }, [token])
 
   const startDeviceCheck = async () => {
     setStep('checking')
@@ -46,12 +54,18 @@ export default function EntryPage() {
     }
   }
 
-  const handleStart = () => {
+  const handleStart = async () => {
     // 停止摄像头流
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop())
     }
-    navigate('/calibrate')
+    try {
+      const session = await sessionsApi.create(token)
+      sessionStorage.setItem('insightux-active-session', JSON.stringify(session))
+      navigate('/calibrate')
+    } catch (error) {
+      setTaskError(error.message)
+    }
   }
 
   // 清理
@@ -95,17 +109,17 @@ export default function EntryPage() {
                   <span className="text-3xl">🛍️</span>
                 </div>
                 <h1 className="text-xl font-semibold text-slate-900 mb-2">
-                  感谢您参与本次用户体验测试
+                  {task?.name || '感谢您参与本次用户体验测试'}
                 </h1>
                 <p className="text-sm text-slate-500 leading-relaxed mb-6">
-                  本次测试约需 1-2 分钟。您将浏览一个模拟的电商结算页面，<br />
+                  {taskError ? `无法加载任务：${taskError}` : '本次测试约需 1-2 分钟。您将浏览一个模拟的电商结算页面，'}<br />
                   请像日常购物一样自然操作即可。
                 </p>
 
                 <div className="bg-slate-50 rounded-xl p-4 text-left mb-6">
                   <div className="text-xs font-medium text-slate-700 mb-2">📋 测试说明</div>
                   <ul className="text-xs text-slate-500 space-y-1.5">
-                    <li>· 我们会通过摄像头捕捉您的面部表情（仅用于分析，不会存储）</li>
+                    <li>· 我们会采集面部表情特征用于分析，不保存原始画面</li>
                     <li>· 我们会记录您的操作行为（点击、停留、鼠标轨迹）</li>
                     <li>· 所有数据仅用于 UX 研究，不会泄露给第三方</li>
                     <li>· 您可以随时退出测试，数据将自动删除</li>
@@ -114,7 +128,8 @@ export default function EntryPage() {
 
                 <button
                   onClick={() => setStep('consent')}
-                  className="w-full py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold text-sm transition-colors"
+                  disabled={!task || !!taskError}
+                  className="w-full py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold text-sm transition-colors disabled:opacity-50"
                 >
                   我已了解，继续
                 </button>

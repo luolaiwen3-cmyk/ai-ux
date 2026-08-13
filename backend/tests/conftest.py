@@ -4,6 +4,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.core.database import Base, create_database_engine, get_db
 from app.main import app
+from app.api.sessions import get_data_dir
 
 
 @pytest.fixture
@@ -17,6 +18,7 @@ def client(tmp_path):
             yield session
 
     app.dependency_overrides[get_db] = override_db
+    app.dependency_overrides[get_data_dir] = lambda: tmp_path / "data"
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()

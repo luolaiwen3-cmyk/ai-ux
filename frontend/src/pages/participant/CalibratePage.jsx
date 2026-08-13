@@ -105,7 +105,8 @@ export default function CalibratePage() {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop())
     }
-    navigate('/task/demo-session-001')
+    const activeSession = JSON.parse(sessionStorage.getItem('insightux-active-session') || 'null')
+    navigate(activeSession?.id ? `/task/${activeSession.id}` : '/')
   }
 
   return (

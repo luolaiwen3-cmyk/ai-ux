@@ -38,3 +38,9 @@ export const tasksApi = {
   update: (id, payload) => apiRequest(`/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
   getPublic: (token) => apiRequest(`/public/tasks/${token}`)
 }
+
+export const sessionsApi = {
+  create: (taskToken) => apiRequest(`/public/tasks/${taskToken}/sessions`, { method: 'POST' }),
+  uploadBatch: (sessionId, uploadToken, payload) => apiRequest(`/public/sessions/${sessionId}/batches`, { method: 'POST', headers: { 'X-Upload-Token': uploadToken }, body: JSON.stringify(payload) }),
+  complete: (sessionId, uploadToken, payload) => apiRequest(`/public/sessions/${sessionId}/complete`, { method: 'POST', headers: { 'X-Upload-Token': uploadToken }, body: JSON.stringify(payload) })
+}
