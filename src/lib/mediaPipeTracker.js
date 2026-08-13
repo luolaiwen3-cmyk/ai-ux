@@ -25,37 +25,67 @@ const CONFIG = {
  * 初始化 FaceLandmarker
  * @returns {Promise<boolean>} 是否初始化成功
  */
+// 超时包装器
+const withTimeout = (promise, ms, label) => {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} 超时 (${ms/1000}s)`)), ms)
+    )
+  ])
+}
+
 export const initMediaPipe = async () => {
   if (faceLandmarker) return true
 
   try {
-    const vision = await FilesetResolver.forVisionTasks(CONFIG.wasmPath)
-    faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
-      baseOptions: {
-        modelAssetPath: CONFIG.modelPath,
-        delegate: 'GPU'
-      },
-      runningMode: 'VIDEO',
-      numFaces: 1,
-      outputFaceBlendshapes: true,
-      outputFacialTransformationMatrixes: false
-    })
-    console.log('[MediaPipe] 初始化成功')
-    return true
-  } catch (err) {
-    console.error('[MediaPipe] 初始化失败:', err)
-    // 降级到 CPU
-    try {
-      const vision = await FilesetResolver.forVisionTasks(CONFIG.wasmPath)
-      faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
+    console.log('[MediaPipe] 加载 WASM...')
+    const vision = await withTimeout(
+      FilesetResolver.forVisionTasks(CONFIG.wasmPath),
+      10000,
+      'WASM 加载'
+    )
+    console.log('[MediaPipe] WASM 加载完成，加载模型...')
+    faceLandmarker = await withTimeout(
+      FaceLandmarker.createFromOptions(vision, {
         baseOptions: {
           modelAssetPath: CONFIG.modelPath,
-          delegate: 'CPU'
+          delegate: 'GPU'
         },
         runningMode: 'VIDEO',
         numFaces: 1,
-        outputFaceBlendshapes: true
-      })
+        outputFaceBlendshapes: true,
+        outputFacialTransformationMatrixes: false
+      }),
+      30000,
+      '模型加载'
+    )
+    console.log('[MediaPipe] 初始化成功')
+    return true
+  } catch (err) {
+    console.error('[MediaPipe] GPU 初始化失败:', err)
+    // 降级到 CPU
+    try {
+      console.log('[MediaPipe] 尝试 CPU 模式...')
+      const vision = await withTimeout(
+        FilesetResolver.forVisionTasks(CONFIG.wasmPath),
+        10000,
+        'WASM 重新加载'
+      )
+      console.log('[MediaPipe] WASM 重新加载完成...')
+      faceLandmarker = await withTimeout(
+        FaceLandmarker.createFromOptions(vision, {
+          baseOptions: {
+            modelAssetPath: CONFIG.modelPath,
+            delegate: 'CPU'
+          },
+          runningMode: 'VIDEO',
+          numFaces: 1,
+          outputFaceBlendshapes: true
+        }),
+        30000,
+        'CPU 模型加载'
+      )
       console.log('[MediaPipe] CPU 模式初始化成功')
       return true
     } catch (err2) {

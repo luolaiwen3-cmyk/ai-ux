@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import AnalystLayout from '../../components/shared/AnalystLayout.jsx'
 import {
@@ -12,40 +12,33 @@ import {
   BarChart,
   Bar
 } from 'recharts'
+import { getDashboardStats, getRecentSessions } from '../../lib/sessionDataService.js'
 
 /**
  * A5 仪表盘 —— 分析人员首页
  * - 普通视图：核心指标 + 最近会话
  * - Admin 全局视图：问题统计 + 趋势图表
+ * 完全使用真实数据
  */
 export default function DashboardPage() {
   const [view, setView] = useState('normal') // normal | admin
+  const [stats, setStats] = useState(null)
+  const [recentSessions, setRecentSessions] = useState([])
 
-  // 模拟趋势数据
-  const trendData = [
-    { day: '08-06', sessions: 5, issues: 2 },
-    { day: '08-07', sessions: 8, issues: 4 },
-    { day: '08-08', sessions: 6, issues: 3 },
-    { day: '08-09', sessions: 12, issues: 7 },
-    { day: '08-10', sessions: 15, issues: 8 },
-    { day: '08-11', sessions: 10, issues: 5 },
-    { day: '08-12', sessions: 18, issues: 11 }
-  ]
+  // 加载真实数据
+  useEffect(() => {
+    const s = getDashboardStats()
+    setStats(s)
 
-  const issueDist = [
-    { type: '文案歧义', count: 8 },
-    { type: '视觉层级', count: 6 },
-    { type: '流程冗长', count: 4 },
-    { type: '交互反馈', count: 3 },
-    { type: '信息架构', count: 2 }
-  ]
-
-  const recentSessions = [
-    { id: 'UX-0812-0037', participant: 'P-042', severity: 'P0', time: '13:21' },
-    { id: 'UX-0812-0036', participant: 'P-041', severity: 'P1', time: '13:15' },
-    { id: 'UX-0812-0035', participant: 'P-040', severity: 'P0', time: '13:08' },
-    { id: 'UX-0812-0034', participant: 'P-039', severity: 'P2', time: '12:55' }
-  ]
+    const recent = getRecentSessions(5)
+    const formatted = recent.map((r, i) => ({
+      id: r.id,
+      participant: `P-${String(i + 1).padStart(3, '0')}`,
+      severity: r.hasFace && r.lastEmotion?.value > 0.7 ? 'P0' : 'P1',
+      time: new Date(r.savedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+    }))
+    setRecentSessions(formatted)
+  }, [])
 
   return (
     <AnalystLayout>
@@ -82,10 +75,10 @@ export default function DashboardPage() {
 
         {/* 核心指标 */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-          <StatCard label="今日会话" value="18" delta="↑ 80%" color="text-cyan-glow" />
-          <StatCard label="发现问题" value="11" delta="↑ 37%" color="text-danger" />
-          <StatCard label="P0 紧急" value="4" delta="+2" color="text-danger" />
-          <StatCard label="已生成报告" value="9" delta="↑ 50%" color="text-emerald-400" />
+          <StatCard label="总会话数" value={stats?.totalSessions || 0} delta={`+${stats?.totalSessions || 0}`} color="text-cyan-glow" />
+          <StatCard label="P0 紧急" value={stats?.p0Count || 0} delta={`${stats?.sessionsWithFace || 0} 含面部`} color="text-danger" />
+          <StatCard label="问题总数" value={stats?.totalIssues || 0} delta="自动检测" color="text-danger" />
+          <StatCard label="面部数据" value={stats?.sessionsWithFace || 0} delta="MediaPipe" color="text-emerald-400" />
         </div>
 
         {/* 普通视图 */}
@@ -148,11 +141,11 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div className="glass rounded-xl p-4">
                 <div className="text-[12px] font-mono text-slate-400 tracking-wide mb-3">
-                  SESSION_TREND · 会话趋势（近 7 天）
+                  SESSION_TREND · 会话趋势
                 </div>
                 <div className="h-[180px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={trendData}>
+                    <AreaChart data={stats?.trendData || []}>
                       <defs>
                         <linearGradient id="sessGrad" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor="#22E6C8" stopOpacity={0.3} />
@@ -205,10 +198,10 @@ export default function DashboardPage() {
 
             {/* Admin 指标 */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <StatCard label="累计会话" value="156" delta="+18" color="text-cyan-glow" />
-              <StatCard label="累计问题" value="84" delta="+11" color="text-danger" />
-              <StatCard label="Agent 调用" value="132" delta="+9" color="text-cyan-soft" />
-              <StatCard label="被试人数" value="48" delta="+6" color="text-emerald-400" />
+              <StatCard label="累计会话" value={stats?.totalSessions || 0} delta="+real" color="text-cyan-glow" />
+              <StatCard label="累计问题" value={stats?.totalIssues || 0} delta="自动" color="text-danger" />
+              <StatCard label="P0 紧急" value={stats?.p0Count || 0} delta="高优先级" color="text-danger" />
+              <StatCard label="面部采集" value={stats?.sessionsWithFace || 0} delta="MediaPipe" color="text-emerald-400" />
             </div>
 
             {/* 系统设置入口 */}

@@ -1,47 +1,39 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import AnalystLayout from '../../components/shared/AnalystLayout.jsx'
+
+const TASKS_KEY = 'insightux-tasks'
 
 /**
  * A1 任务管理 —— 创建测试任务、生成测试链接
+ * 任务数据持久化到 localStorage
  */
 export default function TaskManagePage() {
-  const [tasks, setTasks] = useState([
-    {
-      id: 'TSK-001',
-      name: '电商结算页优惠券弹窗测试',
-      scenario: 'checkout-coupon',
-      link: 'https://demo.insightux.io/join/abc123',
-      sessions: 12,
-      createdAt: '2026-08-10',
-      status: 'active'
-    },
-    {
-      id: 'TSK-002',
-      name: '注册流程简化测试',
-      scenario: 'signup-flow',
-      link: 'https://demo.insightux.io/join/def456',
-      sessions: 8,
-      createdAt: '2026-08-11',
-      status: 'active'
-    },
-    {
-      id: 'TSK-003',
-      name: 'SaaS 仪表盘导航测试',
-      scenario: 'saas-dashboard',
-      link: 'https://demo.insightux.io/join/ghi789',
-      sessions: 0,
-      createdAt: '2026-08-12',
-      status: 'draft'
-    }
-  ])
-
+  const [tasks, setTasks] = useState([])
   const [showCreate, setShowCreate] = useState(false)
   const [newTask, setNewTask] = useState({ name: '', scenario: 'checkout-coupon' })
+
+  // 从 localStorage 加载任务
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(TASKS_KEY)
+      if (saved) {
+        setTasks(JSON.parse(saved))
+      }
+    } catch (e) {
+      console.error('加载任务失败:', e)
+    }
+  }, [])
+
+  // 保存任务到 localStorage
+  const saveTasks = (newTasks) => {
+    setTasks(newTasks)
+    localStorage.setItem(TASKS_KEY, JSON.stringify(newTasks))
+  }
 
   const handleCreate = () => {
     if (!newTask.name.trim()) return
     const id = `TSK-${String(tasks.length + 1).padStart(3, '0')}`
-    setTasks([
+    const newTasks = [
       {
         id,
         name: newTask.name,
@@ -52,7 +44,8 @@ export default function TaskManagePage() {
         status: 'active'
       },
       ...tasks
-    ])
+    ]
+    saveTasks(newTasks)
     setNewTask({ name: '', scenario: 'checkout-coupon' })
     setShowCreate(false)
   }

@@ -22,9 +22,11 @@ export default function CalibratePage() {
 
     const startCalibration = async () => {
       // 1. 初始化 MediaPipe
+      console.log('[Calibrate] 开始初始化 MediaPipe...')
       const mpReady = await initMediaPipe()
       if (cancelled) return
 
+      console.log('[Calibrate] MediaPipe 初始化结果:', mpReady)
       if (!mpReady) {
         console.warn('[Calibrate] MediaPipe 初始化失败，使用模拟模式')
       }
@@ -55,13 +57,17 @@ export default function CalibratePage() {
       // 3. 如果 MediaPipe 就绪，开始真实检测
       if (mpReady && videoRef.current) {
         trackingActive = true
+        console.log('[Calibrate] 开始面部追踪')
         await startTracking(videoRef.current, (result) => {
           if (cancelled) return
+          console.log('[Calibrate] 面部检测:', result.faceDetected, result.emotion?.label)
           setFaceDetected(result.faceDetected)
           if (result.emotion) {
             setCurrentEmotion(result.emotion)
           }
         })
+      } else {
+        console.warn('[Calibrate] MediaPipe 或视频未就绪，跳过追踪')
       }
 
       // 4. 运行校准进度

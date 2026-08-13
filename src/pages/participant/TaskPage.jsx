@@ -113,27 +113,21 @@ export default function TaskPage() {
     }
   }
 
-  // 任务完成（优惠券决策或时长到达）→ 保存后进入感谢页
+  // 任务完成 —— 只有点击"提交订单"才停止录制 → 保存后进入感谢页
   const handleTaskComplete = useCallback(() => {
-    if (!recordingRef.current) return
+    if (!recordingRef.current) return // 防止重复触发
     const events = stopRecording()
     recordingRef.current = false
     setRecording(false)
     setEventCount(events.length)
+
+    // 存储录制数据
     saveToStorage(sessionId)
+    // 进入感谢页
     navigate('/thanks', { replace: true })
   }, [sessionId, navigate])
 
-  // 监听优惠券弹窗关闭 = 任务关键节点
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (recording) {
-        handleTaskComplete()
-      }
-    }, 15000)
-
-    return () => clearTimeout(timer)
-  }, [recording, handleTaskComplete])
+  // 优惠券决策仅记录，不停止录制（已移除 15s 自动停止定时器）
 
   // 截断原因文案
   const stopReasonText = {
@@ -160,7 +154,7 @@ export default function TaskPage() {
       </div>
 
       {/* 真实的结算页 */}
-      <CheckoutPage onDecision={handleTaskComplete} />
+      <CheckoutPage onDecision={() => {}} onSubmit={handleTaskComplete} />
 
       {/* 截断提示 */}
       {stopReason && stopReason !== 'manual' && (
