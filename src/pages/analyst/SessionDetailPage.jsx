@@ -176,7 +176,7 @@ export default function SessionDetailPage() {
             <BehaviorCards stats={metrics} meta={{ id, task: '电商结算页优惠券弹窗测试' }} />
             {hasFace && <FaceDataCard frames={faceFrames} currentTime={currentTime} />}
             <StressChart data={realStressData || stressData} currentTime={currentTime} duration={duration} />
-            <DiagnosisPanel />
+            <DiagnosisPanel metrics={metrics} stressData={realStressData || stressData} hasFace={hasFace} />
           </div>
         </div>
       </div>
