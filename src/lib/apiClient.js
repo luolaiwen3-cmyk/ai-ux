@@ -43,6 +43,25 @@ async function request(path, options = {}) {
   return data
 }
 
+async function uploadZip(path, file) {
+  let response
+  try {
+    response = await fetch(path, {
+      method: 'PUT', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/zip' }, body: file
+    })
+  } catch {
+    throw new ApiError('无法连接 InsightUX 服务，请确认服务已启动')
+  }
+  const data = await response.json().catch(() => null)
+  if (!response.ok) {
+    throw new ApiError(data?.error?.message || `上传失败 (${response.status})`, {
+      status: response.status, code: data?.error?.code || 'UPLOAD_ERROR'
+    })
+  }
+  return data
+}
+
 const sessionTokenKey = (sessionId) => `insightux-session-token:${sessionId}`
 
 export const saveParticipantSession = (session) => {
@@ -69,7 +88,8 @@ export const api = {
   tasks: {
     list: () => request('/api/tasks'),
     create: (input) => request('/api/tasks', { method: 'POST', body: input }),
-    update: (id, input) => request(`/api/tasks/${encodeURIComponent(id)}`, { method: 'PATCH', body: input })
+    update: (id, input) => request(`/api/tasks/${encodeURIComponent(id)}`, { method: 'PATCH', body: input }),
+    uploadSite: (id, file) => uploadZip(`/api/tasks/${encodeURIComponent(id)}/site`, file)
   },
 
   sessions: {

@@ -61,7 +61,7 @@ const requireAdmin = (request, config) => {
 
 const sessionToken = (request) => String(request.headers['x-session-token'] || '')
 
-export function createApiRouter({ store, config }) {
+export function createApiRouter({ store, config, siteStorage = null }) {
   return async function route(request, response) {
     const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`)
     const { pathname } = url
@@ -198,6 +198,26 @@ export function createApiRouter({ store, config }) {
     if (request.method === 'POST' && pathname === '/api/tasks') {
       const body = taskInput(await readJson(request, 64 * 1024))
       sendJson(response, 201, { task: store.createTask(body) })
+      return true
+    }
+
+    const taskSiteMatch = pathname.match(/^\/api\/tasks\/([^/]+)\/site$/)
+    if (request.method === 'PUT' && taskSiteMatch) {
+      if (!siteStorage) throw new HttpError(503, '网页存储服务未配置', 'SITE_STORAGE_UNAVAILABLE')
+      const id = decodeURIComponent(taskSiteMatch[1])
+      const task = store.getTask(id)
+      if (!task) throw new HttpError(404, '任务不存在', 'TASK_NOT_FOUND')
+      if (task.targetType !== 'upload') throw new HttpError(409, '只有 ZIP 类型任务可以上传网页', 'INVALID_TARGET_TYPE')
+      const installed = await siteStorage.installZip(request, task)
+      const updated = store.updateTask(id, installed)
+      sendJson(response, 200, {
+        task: updated,
+        site: {
+          fileCount: installed.fileCount,
+          expandedBytes: installed.expandedBytes,
+          launchUrl: `/test-content/${updated.contentToken}/index.html`
+        }
+      })
       return true
     }
 

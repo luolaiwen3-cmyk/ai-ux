@@ -13,6 +13,7 @@ export const config = {
   host: process.env.HOST || '0.0.0.0',
   port: Number(process.env.PORT || 8787),
   databasePath: path.resolve(process.env.INSIGHTUX_DB_PATH || './data/insightux.db'),
+  siteDir: path.resolve(process.env.INSIGHTUX_SITE_DIR || './data/task-sites'),
   adminPassword: process.env.ADMIN_PASSWORD || 'insightux-demo',
   sessionSecret: process.env.ADMIN_SESSION_SECRET || 'insightux-development-secret-change-me',
   publicAppUrl: process.env.PUBLIC_APP_URL || 'http://localhost:8787',

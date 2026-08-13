@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { config, validateConfig } from './config.js'
 import { createStore } from './db.js'
 import { handleApiError, createApiRouter } from './router.js'
+import { createSiteStorage } from './siteStorage.js'
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const distDir = path.join(rootDir, 'dist')
@@ -26,7 +27,8 @@ const mimeTypes = {
 validateConfig()
 const store = createStore(config.databasePath)
 store.seedDemoTask()
-const routeApi = createApiRouter({ store, config })
+const siteStorage = createSiteStorage(config.siteDir)
+const routeApi = createApiRouter({ store, config, siteStorage })
 
 function serveFile(response, filePath) {
   const extension = path.extname(filePath).toLowerCase()
@@ -53,6 +55,7 @@ function serveApp(request, response) {
 const server = createServer(async (request, response) => {
   try {
     if (await routeApi(request, response)) return
+    if (siteStorage.serve(request, response, store)) return
     if (serveApp(request, response)) return
     response.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' })
     response.end(JSON.stringify({ error: { code: 'NOT_FOUND', message: '接口不存在' } }))

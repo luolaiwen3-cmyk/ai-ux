@@ -208,6 +208,10 @@ export function createStore(databasePath) {
       return mapTask(database.prepare(`${taskSelect} WHERE tasks.id = ?`).get(id))
     },
 
+    getTaskByContentToken(token) {
+      return mapTask(database.prepare(`${taskSelect} WHERE tasks.content_token = ?`).get(token))
+    },
+
     getPublicTask(token) {
       return mapTask(database.prepare(`${taskSelect} WHERE tasks.token = ? AND tasks.status = 'active'`).get(token))
     },
