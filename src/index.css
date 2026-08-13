@@ -222,6 +222,16 @@ body {
   color: #9ca3af !important;
 }
 
+.login-password-input:-webkit-autofill,
+.login-password-input:-webkit-autofill:hover,
+.login-password-input:-webkit-autofill:focus,
+.login-password-input:-webkit-autofill:active {
+  -webkit-text-fill-color: #0f172a;
+  caret-color: #0f172a;
+  box-shadow: 0 0 0 1000px #ffffff inset;
+  transition: background-color 9999s ease-out 0s;
+}
+
 @layer components {
   .primary-button {
     @apply flex-1 w-full py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold text-sm transition-colors;
