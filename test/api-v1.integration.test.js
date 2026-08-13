@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict'
+import { mkdtempSync } from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import test from 'node:test'
+import yazl from 'yazl'
 import { createApp } from '../server/app.js'
 import { openDatabase } from '../server/database.js'
 
@@ -14,7 +18,22 @@ const config = {
   seedDemo: false
 }
 
-const buildApp = () => createApp({ config, database: openDatabase(':memory:'), logger: false })
+const buildApp = () => createApp({
+  config: { ...config, siteDir: mkdtempSync(path.join(os.tmpdir(), 'insightux-v1-sites-')) },
+  database: openDatabase(':memory:'),
+  logger: false,
+  apiOnly: true
+})
+
+const createZip = (files) => new Promise((resolve, reject) => {
+  const zip = new yazl.ZipFile()
+  const chunks = []
+  zip.outputStream.on('data', (chunk) => chunks.push(chunk))
+  zip.outputStream.on('error', reject)
+  zip.outputStream.on('end', () => resolve(Buffer.concat(chunks)))
+  Object.entries(files).forEach(([name, content]) => zip.addBuffer(Buffer.from(content), name))
+  zip.end()
+})
 
 const login = async (app) => {
   const response = await app.inject({
@@ -111,6 +130,47 @@ test('v1 API 通过 Schema、Cookie 和 Bearer Token 拒绝非法请求', async 
     assert.equal(invalid.statusCode, 400)
     assert.equal(invalid.json().error.code, 'VALIDATION_ERROR')
     assert.ok(invalid.json().error.details.length > 0)
+  } finally {
+    await app.close()
+  }
+})
+
+test('v1 API 流式安装并隔离托管 ZIP 测试网站', async () => {
+  const app = buildApp()
+  try {
+    const cookie = await login(app)
+    const created = await app.inject({
+      method: 'POST', url: '/api/v1/tasks', headers: { cookie },
+      payload: {
+        name: 'ZIP 任务', steps: ['完成'], targetType: 'upload', status: 'draft'
+      }
+    })
+    const task = created.json().data
+    const archive = await createZip({
+      'index.html': '<!doctype html><head></head><body>ZIP</body>',
+      'app.js': 'document.body.dataset.loaded = "true"'
+    })
+    const installed = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/tasks/${task.id}/site`,
+      headers: { cookie, 'content-type': 'application/zip' },
+      payload: archive
+    })
+    assert.equal(installed.statusCode, 200)
+    const updated = installed.json().data.task
+    assert.equal(updated.targetStatus, 'ready')
+
+    const page = await app.inject({
+      method: 'GET', url: `/test-content/${updated.contentToken}/index.html`
+    })
+    assert.equal(page.statusCode, 200)
+    assert.match(page.body, /insightux-recorder\.js/)
+    assert.match(page.headers['content-security-policy'], /^sandbox/)
+
+    const escaped = await app.inject({
+      method: 'GET', url: `/test-content/${updated.contentToken}/..%2F..%2Fpackage.json`
+    })
+    assert.equal(escaped.statusCode, 404)
   } finally {
     await app.close()
   }

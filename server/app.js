@@ -2,6 +2,8 @@ import cookie from '@fastify/cookie'
 import swagger from '@fastify/swagger'
 import swaggerUi from '@fastify/swagger-ui'
 import Fastify from 'fastify'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { ADMIN_COOKIE_NAME, verifyPassword } from './auth.js'
 import { openDatabase } from './database.js'
 import { AppError, unauthorized } from './errors.js'
@@ -10,7 +12,9 @@ import { authRoutes } from './routes/auth.js'
 import { participantRoutes } from './routes/participant.js'
 import { sessionRoutes } from './routes/sessions.js'
 import { taskRoutes } from './routes/tasks.js'
+import { registerApplicationAssets, siteRoutes } from './routes/storage.js'
 import { createServices } from './services.js'
+import { createSiteStorage } from './siteStorage.js'
 
 const runtimeLogger = {
   level: 'info',
@@ -29,7 +33,7 @@ const errorPayload = (request, code, message, details) => ({
   }
 })
 
-export function createApp({ config, database: suppliedDatabase, logger } = {}) {
+export function createApp({ config, database: suppliedDatabase, logger, apiOnly = false } = {}) {
   if (!config) throw new Error('createApp 必须提供 config')
 
   const app = Fastify({
@@ -39,10 +43,12 @@ export function createApp({ config, database: suppliedDatabase, logger } = {}) {
   const database = suppliedDatabase || openDatabase(config.databasePath)
   const repositories = createRepositories(database)
   const services = createServices({ repositories, config })
+  const siteStorage = createSiteStorage(config.siteDir || './data/task-sites')
 
   app.decorate('config', config)
   app.decorate('repositories', repositories)
   app.decorate('services', services)
+  app.decorate('siteStorage', siteStorage)
   app.decorate('verifyAdminPassword', (password) => verifyPassword(password, config.adminPassword))
 
   app.register(cookie, { secret: config.sessionSecret, hook: 'onRequest' })
@@ -99,6 +105,11 @@ export function createApp({ config, database: suppliedDatabase, logger } = {}) {
     api.register(sessionRoutes, { prefix: '/api/v1' })
     done()
   })
+  app.register(siteRoutes)
+  if (!apiOnly) {
+    const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+    app.register(registerApplicationAssets, { distDir: path.join(rootDir, 'dist') })
+  }
   if (!config.isProduction) {
     app.register(swaggerUi, { routePrefix: '/docs' })
   }
@@ -108,6 +119,9 @@ export function createApp({ config, database: suppliedDatabase, logger } = {}) {
       return reply.code(error.statusCode).send(
         errorPayload(request, error.code, error.message, error.details)
       )
+    }
+    if (Number.isInteger(error.status) && error.code) {
+      return reply.code(error.status).send(errorPayload(request, error.code, error.message))
     }
     if (error.validation) {
       return reply.code(400).send(errorPayload(

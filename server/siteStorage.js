@@ -173,6 +173,40 @@ export function createSiteStorage(rootDir) {
       }
     },
 
+    async resolveAsset(task, requestedPath = 'index.html') {
+      if (!task?.contentRevision) return null
+      let requested
+      try {
+        requested = decodeURIComponent(requestedPath || 'index.html')
+      } catch {
+        return null
+      }
+      const base = path.resolve(resolvedRoot, task.id, task.contentRevision)
+      let candidate = path.resolve(base, requested)
+      if (candidate !== base && !candidate.startsWith(`${base}${path.sep}`)) return null
+      if (existsSync(candidate) && statSync(candidate).isDirectory()) candidate = path.join(candidate, 'index.html')
+      if (!existsSync(candidate) || !statSync(candidate).isFile()) return null
+
+      const extension = path.extname(candidate).toLowerCase()
+      const headers = {
+        'Content-Type': mimeTypes[extension] || 'application/octet-stream',
+        'Cache-Control': extension === '.html' ? 'no-store' : 'public, max-age=31536000, immutable',
+        'Content-Security-Policy': "sandbox allow-scripts allow-forms allow-modals allow-popups; default-src 'self' data: blob: https: http:; script-src 'self' 'unsafe-inline' data: blob: https: http:;",
+        'X-Content-Type-Options': 'nosniff',
+        'Referrer-Policy': 'no-referrer'
+      }
+      if (extension !== '.html') return { body: createReadStream(candidate), headers }
+
+      const source = await readFile(candidate, 'utf8')
+      const loader = `<script src="/insightux-recorder.js" data-task-id="${task.id}"></script>`
+      return {
+        body: source.includes('</head>')
+          ? source.replace('</head>', `${loader}</head>`)
+          : `${loader}${source}`,
+        headers
+      }
+    },
+
     async serve(request, response, store) {
       const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`)
       const match = url.pathname.match(/^\/test-content\/([^/]+)(?:\/(.*))?$/)

@@ -1,6 +1,10 @@
 import { idParams, listDataResponse, objectDataResponse, createTaskBody, updateTaskBody } from './schemas.js'
 
 export function taskRoutes(app, _options, done) {
+  app.addContentTypeParser(
+    ['application/zip', 'application/x-zip-compressed'],
+    (request, payload, next) => next(null, payload)
+  )
   app.addHook('preHandler', app.requireAdmin)
 
   app.get('/tasks', {
@@ -65,6 +69,24 @@ export function taskRoutes(app, _options, done) {
   }, async (request, reply) => reply.code(201).send({
     data: app.services.sessions.createTrial(request.params.taskId)
   }))
+
+  app.put('/tasks/:taskId/site', {
+    schema: { tags: ['tasks'], params: idParams('taskId') }
+  }, async (request) => {
+    const task = app.services.tasks.get(request.params.taskId)
+    const installed = await app.siteStorage.installZip(request.body, task)
+    const updated = app.services.tasks.installSite(task.id, installed)
+    return {
+      data: {
+        task: updated,
+        site: {
+          fileCount: installed.fileCount,
+          expandedBytes: installed.expandedBytes,
+          launchUrl: `/test-content/${updated.contentToken}/index.html`
+        }
+      }
+    }
+  })
 
   done()
 }
