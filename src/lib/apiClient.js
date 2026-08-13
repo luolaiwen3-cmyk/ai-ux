@@ -79,7 +79,8 @@ export const api = {
       query.set('sort', sort)
       return request(`/api/sessions?${query}`)
     },
-    get: (id) => request(`/api/sessions/${encodeURIComponent(id)}`)
+    get: (id) => request(`/api/sessions/${encodeURIComponent(id)}`),
+    diagnose: (id) => request(`/api/sessions/${encodeURIComponent(id)}/diagnose`, { method: 'POST' })
   },
 
   dashboard: {
@@ -108,5 +109,9 @@ export const api = {
       method: 'DELETE',
       headers: participantHeaders(id)
     })
+  },
+
+  reports: {
+    getShared: (token) => request(`/api/public/reports/${encodeURIComponent(token)}`)
   }
 }

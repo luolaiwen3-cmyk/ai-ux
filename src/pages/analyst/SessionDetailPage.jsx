@@ -183,7 +183,11 @@ export default function SessionDetailPage() {
             <BehaviorCards stats={displayMetrics} meta={{ id: session.participantCode, task: session.taskName }} />
             {hasFace && <FaceDataCard frames={faceFrames} currentTime={currentTime} />}
             <StressChart data={realStressData} currentTime={currentTime} duration={duration} />
-            <DiagnosisPanel metrics={displayMetrics} stressData={realStressData} hasFace={hasFace} />
+            <DiagnosisPanel
+              sessionId={session.id}
+              initialDiagnosis={session.diagnosis}
+              onDiagnosed={(diagnosis) => setSession((current) => ({ ...current, diagnosis }))}
+            />
           </div>
         </div>
       </div>
