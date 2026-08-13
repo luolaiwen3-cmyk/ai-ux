@@ -19,8 +19,8 @@ export default function DiagnosisPanel({ sessionId, initialDiagnosis = null, onD
     setError('')
     try {
       const result = await api.sessions.diagnose(sessionId)
-      setDiagnosis(result.diagnosis)
-      onDiagnosed?.(result.diagnosis)
+      setDiagnosis(result)
+      onDiagnosed?.(result)
     } catch (requestError) {
       setError(requestError.message)
     } finally {

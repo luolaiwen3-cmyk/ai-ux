@@ -23,7 +23,7 @@ export default function SessionListPage() {
     setError('')
     try {
       const result = await api.sessions.list({ sort, scope })
-      setSessions(result.sessions)
+      setSessions(result.data)
     } catch (requestError) {
       setError(requestError.message)
     } finally {

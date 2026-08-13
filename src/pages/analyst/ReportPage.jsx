@@ -13,7 +13,7 @@ export default function ReportPage() {
   useEffect(() => {
     let active = true
     api.sessions.get(id)
-      .then((result) => { if (active) setSession(result.session) })
+      .then((result) => { if (active) setSession(result) })
       .catch((requestError) => { if (active) setError(requestError.message) })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }

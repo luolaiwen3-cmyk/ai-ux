@@ -7,7 +7,7 @@ export class ApiError extends Error {
   }
 }
 
-async function request(path, options = {}) {
+async function requestEnvelope(path, options = {}) {
   const headers = new Headers(options.headers || {})
   if (options.body !== undefined && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
@@ -43,6 +43,8 @@ async function request(path, options = {}) {
   return data
 }
 
+const request = async (path, options = {}) => (await requestEnvelope(path, options)).data
+
 async function uploadZip(path, file) {
   let response
   try {
@@ -59,7 +61,7 @@ async function uploadZip(path, file) {
       status: response.status, code: data?.error?.code || 'UPLOAD_ERROR'
     })
   }
-  return data
+  return data.data
 }
 
 const sessionTokenKey = (sessionId) => `insightux-session-token:${sessionId}`
@@ -75,23 +77,23 @@ export const clearParticipantSession = (sessionId) =>
   sessionStorage.removeItem(sessionTokenKey(sessionId))
 
 const participantHeaders = (sessionId) => ({
-  'X-Session-Token': getParticipantToken(sessionId)
+  Authorization: `Bearer ${getParticipantToken(sessionId)}`
 })
 
 export const api = {
   auth: {
-    me: () => request('/api/auth/me'),
-    login: (password) => request('/api/auth/login', { method: 'POST', body: { password } }),
-    logout: () => request('/api/auth/logout', { method: 'POST' })
+    me: () => request('/api/v1/auth/me'),
+    login: (password) => request('/api/v1/auth/login', { method: 'POST', body: { password } }),
+    logout: () => request('/api/v1/auth/logout', { method: 'POST' })
   },
 
   tasks: {
-    list: () => request('/api/tasks'),
-    create: (input) => request('/api/tasks', { method: 'POST', body: input }),
-    update: (id, input) => request(`/api/tasks/${encodeURIComponent(id)}`, { method: 'PATCH', body: input }),
-    uploadSite: (id, file) => uploadZip(`/api/tasks/${encodeURIComponent(id)}/site`, file),
-    validateUrl: (id, input) => request(`/api/tasks/${encodeURIComponent(id)}/validate-url`, { method: 'POST', body: input }),
-    createTrial: (id) => request(`/api/tasks/${encodeURIComponent(id)}/trials`, { method: 'POST' })
+    list: () => requestEnvelope('/api/v1/tasks'),
+    create: (input) => request('/api/v1/tasks', { method: 'POST', body: input }),
+    update: (id, input) => request(`/api/v1/tasks/${encodeURIComponent(id)}`, { method: 'PATCH', body: input }),
+    uploadSite: (id, file) => uploadZip(`/api/v1/tasks/${encodeURIComponent(id)}/site`, file),
+    validateUrl: (id, input) => request(`/api/v1/tasks/${encodeURIComponent(id)}/url-validation`, { method: 'POST', body: input }),
+    createTrial: (id) => request(`/api/v1/tasks/${encodeURIComponent(id)}/trials`, { method: 'POST' })
   },
 
   sessions: {
@@ -99,42 +101,42 @@ export const api = {
       const query = new URLSearchParams()
       if (status) query.set('status', status)
       query.set('sort', sort)
-      query.set('scope', scope)
-      return request(`/api/sessions?${query}`)
+      query.set('mode', scope)
+      return requestEnvelope(`/api/v1/sessions?${query}`)
     },
-    get: (id) => request(`/api/sessions/${encodeURIComponent(id)}`),
-    diagnose: (id) => request(`/api/sessions/${encodeURIComponent(id)}/diagnose`, { method: 'POST' })
+    get: (id) => request(`/api/v1/sessions/${encodeURIComponent(id)}`),
+    diagnose: (id) => request(`/api/v1/sessions/${encodeURIComponent(id)}/diagnosis`, { method: 'POST' })
   },
 
   dashboard: {
-    get: () => request('/api/dashboard')
+    get: () => request('/api/v1/dashboard')
   },
 
   participant: {
-    getTask: (token) => request(`/api/public/tasks/${encodeURIComponent(token)}`),
-    createSession: (token) => request(`/api/public/tasks/${encodeURIComponent(token)}/sessions`, {
+    getTask: (token) => request(`/api/v1/participant/tasks/${encodeURIComponent(token)}`),
+    createSession: (token) => request(`/api/v1/participant/tasks/${encodeURIComponent(token)}/sessions`, {
       method: 'POST',
       body: { consent: true }
     }),
-    getSession: (id) => request(`/api/public/sessions/${encodeURIComponent(id)}`, {
+    getSession: (id) => request(`/api/v1/participant/sessions/${encodeURIComponent(id)}`, {
       headers: participantHeaders(id)
     }),
-    startSession: (id) => request(`/api/public/sessions/${encodeURIComponent(id)}/start`, {
+    startSession: (id) => request(`/api/v1/participant/sessions/${encodeURIComponent(id)}/start`, {
       method: 'POST',
       headers: participantHeaders(id)
     }),
-    completeSession: (id, input) => request(`/api/public/sessions/${encodeURIComponent(id)}/complete`, {
+    completeSession: (id, input) => request(`/api/v1/participant/sessions/${encodeURIComponent(id)}/complete`, {
       method: 'POST',
       headers: participantHeaders(id),
       body: input
     }),
-    abandonSession: (id) => request(`/api/public/sessions/${encodeURIComponent(id)}`, {
+    abandonSession: (id) => request(`/api/v1/participant/sessions/${encodeURIComponent(id)}`, {
       method: 'DELETE',
       headers: participantHeaders(id)
     })
   },
 
   reports: {
-    getShared: (token) => request(`/api/public/reports/${encodeURIComponent(token)}`)
+    getShared: (token) => request(`/api/v1/reports/${encodeURIComponent(token)}`)
   }
 }

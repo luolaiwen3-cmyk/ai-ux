@@ -30,7 +30,7 @@ export default function DashboardPage() {
   useEffect(() => {
     let active = true
     api.dashboard.get()
-      .then(({ stats: nextStats }) => {
+      .then((nextStats) => {
         if (!active) return
         setStats(nextStats)
         setRecentSessions(nextStats.recentSessions)

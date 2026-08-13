@@ -43,7 +43,7 @@ export default function TaskPage() {
     }
 
     api.participant.getSession(sessionId)
-      .then(({ session }) => {
+      .then((session) => {
         if (cancelled) return
         if (!['created', 'recording'].includes(session.status)) {
           navigate('/thanks', { replace: true })

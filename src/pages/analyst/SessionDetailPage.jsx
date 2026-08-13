@@ -37,7 +37,7 @@ export default function SessionDetailPage() {
     setError('')
     api.sessions.get(id)
       .then((result) => {
-        if (active) setSession(result.session)
+        if (active) setSession(result)
       })
       .catch((requestError) => {
         if (active) setError(requestError.message)

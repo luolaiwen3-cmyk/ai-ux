@@ -19,7 +19,7 @@ export default function EntryPage() {
     let active = true
     api.participant.getTask(token)
       .then((result) => {
-        if (active) setTask(result.task)
+        if (active) setTask(result)
       })
       .catch((error) => {
         if (active) setPageError(error.message)
@@ -100,9 +100,9 @@ export default function EntryPage() {
     setPageError('')
     try {
       const result = await api.participant.createSession(token)
-      saveParticipantSession(result.session)
+      saveParticipantSession(result)
       stopDevices()
-      navigate(`/calibrate/${result.session.id}`)
+      navigate(`/calibrate/${result.id}`)
     } catch (error) {
       setPageError(error.message)
       setCreating(false)
@@ -114,10 +114,10 @@ export default function EntryPage() {
     setPageError('')
     try {
       const result = await api.participant.createSession(token)
-      saveParticipantSession(result.session)
-      await api.participant.startSession(result.session.id)
+      saveParticipantSession(result)
+      await api.participant.startSession(result.id)
       stopDevices()
-      navigate(`/task/${result.session.id}`, { state: { behaviorOnly: true } })
+      navigate(`/task/${result.id}`, { state: { behaviorOnly: true } })
     } catch (error) {
       setPageError(error.message)
       setCreating(false)

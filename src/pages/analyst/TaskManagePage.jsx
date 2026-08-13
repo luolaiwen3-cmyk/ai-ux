@@ -31,8 +31,8 @@ export default function TaskManagePage() {
     setError('')
     try {
       const result = await api.tasks.list()
-      setTasks(result.tasks)
-      if (result.publicAppUrl) setPublicAppUrl(result.publicAppUrl)
+      setTasks(result.data)
+      if (result.meta.publicAppUrl) setPublicAppUrl(result.meta.publicAppUrl)
     } catch (requestError) {
       setError(requestError.message)
     } finally {
@@ -61,10 +61,10 @@ export default function TaskManagePage() {
         targetUrl: newTask.targetType === 'url' ? newTask.targetUrl.trim() : undefined,
         status: newTask.targetType === 'builtin' ? requestedStatus : 'draft'
       })
-      let task = result.task
+      let task = result
       if (newTask.targetType === 'upload') {
         task = (await api.tasks.uploadSite(task.id, newTask.siteFile)).task
-        if (requestedStatus === 'active') task = (await api.tasks.update(task.id, { status: 'active' })).task
+        if (requestedStatus === 'active') task = await api.tasks.update(task.id, { status: 'active' })
       }
       setTasks((current) => [task, ...current])
       setNewTask(initialTask())
@@ -81,7 +81,7 @@ export default function TaskManagePage() {
 
   const updateStatus = async (task, status) => {
     setError('')
-    try { replaceTask((await api.tasks.update(task.id, { status })).task) }
+    try { replaceTask(await api.tasks.update(task.id, { status })) }
     catch (requestError) { setError(requestError.message) }
   }
 
@@ -90,8 +90,8 @@ export default function TaskManagePage() {
     setError('')
     try {
       const result = await api.tasks.createTrial(task.id)
-      saveParticipantSession(result.session)
-      navigate(`/calibrate/${result.session.id}`, { state: { trial: true } })
+      saveParticipantSession(result)
+      navigate(`/calibrate/${result.id}`, { state: { trial: true } })
     } catch (requestError) { setError(requestError.message) }
     finally { setSaving(false) }
   }
@@ -121,7 +121,7 @@ export default function TaskManagePage() {
         name: editTask.name.trim(), description: editTask.description.trim(), steps,
         ...(current?.targetType === 'url' ? { targetUrl: editTask.targetUrl.trim() } : {})
       })
-      replaceTask(result.task)
+      replaceTask(result)
       setEditingId('')
       setEditTask(null)
     } catch (requestError) { setError(requestError.message) }
@@ -230,7 +230,7 @@ function UrlValidator({ task, snippet, onValidated, onCopy, copied }) {
         const result = await api.tasks.validateUrl(task.id, { origin: event.origin, sdkVersion: data.version })
         setState('ready')
         setMessage('验证通过，可以发布并试跑。')
-        onValidated(result.task)
+        onValidated(result)
       } catch (error) { setState('error'); setMessage(error.message) }
     }
     window.addEventListener('message', listener)

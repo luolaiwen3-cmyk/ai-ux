@@ -11,7 +11,7 @@ export default function SharedReportPage() {
   useEffect(() => {
     let active = true
     api.reports.getShared(token)
-      .then(({ report }) => { if (active) setSession(report) })
+      .then((report) => { if (active) setSession(report) })
       .catch((requestError) => { if (active) setError(requestError.message) })
     return () => { active = false }
   }, [token])
