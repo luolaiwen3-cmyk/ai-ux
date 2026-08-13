@@ -142,6 +142,63 @@ body {
   animation: shimmer 1.6s linear infinite;
 }
 
+/* 分析工作台：浅色底、深色正文。参与者页面不受影响。 */
+.analyst-theme {
+  background: #ffffff;
+  color: #111827;
+  color-scheme: light;
+}
+
+.analyst-theme .glass,
+.analyst-theme .glass-strong {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  backdrop-filter: none;
+}
+
+.analyst-theme [class*='bg-ink-'] {
+  background-color: #f8fafc !important;
+}
+
+.analyst-theme [class*='text-slate-100'],
+.analyst-theme [class*='text-slate-200'],
+.analyst-theme [class*='text-slate-300'],
+.analyst-theme [class*='text-cyan-glow'],
+.analyst-theme [class*='text-cyan-soft'] {
+  color: #111827 !important;
+}
+
+.analyst-theme [class*='text-slate-400'] {
+  color: #374151 !important;
+}
+
+.analyst-theme [class*='text-slate-500'],
+.analyst-theme [class*='text-slate-600'] {
+  color: #6b7280 !important;
+}
+
+.analyst-theme [class*='border-cyan-glow'],
+.analyst-theme [class*='border-cyan-soft'] {
+  border-color: #d1d5db !important;
+}
+
+.analyst-theme input,
+.analyst-theme select {
+  background: #ffffff !important;
+  border-color: #d1d5db !important;
+  color: #111827 !important;
+}
+
+.analyst-theme input::placeholder {
+  color: #9ca3af !important;
+}
+
+.analyst-theme .text-gradient {
+  background: none;
+  color: #111827;
+}
+
 /* 报告导出：浏览器打印对话框可直接另存为 PDF。 */
 @media print {
   @page {
@@ -153,7 +210,7 @@ body {
   body,
   #root {
     height: auto;
-    background: #070a0f;
+    background: #ffffff;
   }
 
   aside,

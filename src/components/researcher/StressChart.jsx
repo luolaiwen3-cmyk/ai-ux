@@ -41,31 +41,31 @@ export default function StressChart({ data, currentTime, duration }) {
                 <stop offset="100%" stopColor="#22E6C8" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid stroke="rgba(34,230,200,0.08)" strokeDasharray="3 3" />
+            <CartesianGrid stroke="#e5e7eb" strokeDasharray="3 3" />
             <XAxis
               dataKey="t"
               type="number"
               domain={[0, duration]}
               ticks={[0, 5, 10, 14.5, 15, 20]}
-              tick={{ fill: '#64748b', fontSize: 9, fontFamily: 'JetBrains Mono' }}
+              tick={{ fill: '#374151', fontSize: 9, fontFamily: 'JetBrains Mono' }}
               tickFormatter={(v) => (v === 14.5 ? '14.5*' : `${v}s`)}
-              stroke="rgba(34,230,200,0.15)"
+              stroke="#d1d5db"
             />
             <YAxis
               domain={[0, 1]}
               ticks={[0, 0.25, 0.5, 0.75, 1]}
-              tick={{ fill: '#64748b', fontSize: 9, fontFamily: 'JetBrains Mono' }}
-              stroke="rgba(34,230,200,0.15)"
+              tick={{ fill: '#374151', fontSize: 9, fontFamily: 'JetBrains Mono' }}
+              stroke="#d1d5db"
               tickFormatter={(v) => v.toFixed(2)}
             />
             <Tooltip
               contentStyle={{
-                background: 'rgba(11,16,24,0.95)',
-                border: '1px solid rgba(34,230,200,0.25)',
+                background: '#ffffff',
+                border: '1px solid #d1d5db',
                 borderRadius: 8,
                 fontSize: 11,
                 fontFamily: 'JetBrains Mono',
-                color: '#e6edf6'
+                color: '#111827'
               }}
               labelFormatter={(v) => `t = ${Number(v).toFixed(2)}s`}
               formatter={(v) => [Number(v).toFixed(3), '压力值']}

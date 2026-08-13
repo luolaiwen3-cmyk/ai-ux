@@ -159,16 +159,16 @@ export default function DashboardPage() {
                           <stop offset="100%" stopColor="#22E6C8" stopOpacity={0} />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid stroke="rgba(34,230,200,0.08)" strokeDasharray="3 3" />
-                      <XAxis dataKey="day" tick={{ fill: '#64748b', fontSize: 10 }} stroke="rgba(34,230,200,0.15)" />
-                      <YAxis tick={{ fill: '#64748b', fontSize: 10 }} stroke="rgba(34,230,200,0.15)" />
+                      <CartesianGrid stroke="#e5e7eb" strokeDasharray="3 3" />
+                      <XAxis dataKey="day" tick={{ fill: '#374151', fontSize: 10 }} stroke="#d1d5db" />
+                      <YAxis tick={{ fill: '#374151', fontSize: 10 }} stroke="#d1d5db" />
                       <Tooltip
                         contentStyle={{
-                          background: 'rgba(11,16,24,0.95)',
-                          border: '1px solid rgba(34,230,200,0.25)',
+                          background: '#ffffff',
+                          border: '1px solid #d1d5db',
                           borderRadius: 8,
                           fontSize: 11,
-                          color: '#e6edf6'
+                          color: '#111827'
                         }}
                       />
                       <Area type="monotone" dataKey="sessions" stroke="#22E6C8" fill="url(#sessGrad)" strokeWidth={2} />
@@ -184,16 +184,16 @@ export default function DashboardPage() {
                 <div className="h-[180px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={issueDist} layout="vertical">
-                      <CartesianGrid stroke="rgba(34,230,200,0.08)" strokeDasharray="3 3" />
-                      <XAxis type="number" tick={{ fill: '#64748b', fontSize: 10 }} stroke="rgba(34,230,200,0.15)" />
-                      <YAxis dataKey="type" type="category" tick={{ fill: '#94a3b8', fontSize: 10 }} stroke="rgba(34,230,200,0.15)" width={70} />
+                      <CartesianGrid stroke="#e5e7eb" strokeDasharray="3 3" />
+                      <XAxis type="number" tick={{ fill: '#374151', fontSize: 10 }} stroke="#d1d5db" />
+                      <YAxis dataKey="type" type="category" tick={{ fill: '#374151', fontSize: 10 }} stroke="#d1d5db" width={70} />
                       <Tooltip
                         contentStyle={{
-                          background: 'rgba(11,16,24,0.95)',
-                          border: '1px solid rgba(34,230,200,0.25)',
+                          background: '#ffffff',
+                          border: '1px solid #d1d5db',
                           borderRadius: 8,
                           fontSize: 11,
-                          color: '#e6edf6'
+                          color: '#111827'
                         }}
                       />
                       <Bar dataKey="count" fill="#3FB7FF" radius={[0, 4, 4, 0]} />

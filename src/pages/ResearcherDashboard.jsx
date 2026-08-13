@@ -64,18 +64,18 @@ export default function ResearcherDashboard() {
   }
 
   return (
-    <div className="relative z-10 flex flex-col h-screen">
+    <div className="analyst-theme relative z-10 flex flex-col h-screen bg-white text-slate-900">
       {/* 顶部导航 */}
-      <header className="flex items-center justify-between px-5 py-3 border-b border-cyan-glow/10 shrink-0">
+      <header className="flex items-center justify-between px-5 py-3 border-b border-slate-200 bg-white shrink-0">
         <div className="flex items-center gap-3">
-          <div className="relative w-9 h-9 rounded-lg bg-gradient-to-br from-cyan-glow to-cyan-soft flex items-center justify-center shadow-glow">
+          <div className="relative w-9 h-9 rounded-lg bg-slate-900 flex items-center justify-center">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14l6 3-6 3z" fill="#070A0F" fillOpacity="0.85" />
+              <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14l6 3-6 3z" fill="#FFFFFF" />
             </svg>
           </div>
           <div className="leading-tight">
             <div className="text-[15px] font-semibold tracking-wide">
-              <span className="text-gradient">InsightUX</span>
+              <span className="text-slate-950">InsightUX</span>
               <span className="text-slate-400 font-normal ml-2">后台分析工作台</span>
             </div>
             <div className="text-[11px] text-slate-500 font-mono tracking-wider">
@@ -87,7 +87,7 @@ export default function ResearcherDashboard() {
         <div className="flex items-center gap-3">
           <Link
             to="/"
-            className="px-3 py-1.5 rounded-md bg-ink-700/60 border border-cyan-glow/10 text-[11px] font-mono text-slate-300 hover:text-cyan-glow transition-colors"
+            className="px-3 py-1.5 rounded-md bg-white border border-slate-300 text-[11px] font-mono text-slate-900 hover:bg-slate-50 transition-colors"
           >
             ← 返回被试画面
           </Link>
