@@ -57,6 +57,35 @@ export default function TaskPage() {
   useEffect(() => {
     if (!sessionReady) return undefined
 
+    const startFaceCapture = async () => {
+      try {
+        const mpReady = await initMediaPipe()
+        if (!mpReady) return
+        const stream = await getCameraStream()
+        if (!stream) return
+        streamRef.current = stream
+
+        if (!videoRef.current) {
+          const video = document.createElement('video')
+          video.srcObject = stream
+          await video.play()
+          video.style.display = 'none'
+          document.body.appendChild(video)
+          videoRef.current = video
+        }
+
+        await startTracking(videoRef.current, (result) => {
+          const now = Date.now()
+          if (now - lastFaceCaptureRef.current > 200) {
+            lastFaceCaptureRef.current = now
+            saveFrame(sessionId, result)
+          }
+        })
+      } catch (error) {
+        console.error('[TaskPage] 面部采集启动失败:', error)
+      }
+    }
+
     // 1. 开始 rrweb 录制
     const onEvent = (event) => {
       if (event.type === '_stopped') {
@@ -95,48 +124,6 @@ export default function TaskPage() {
       }
     }
   }, [sessionId, sessionReady, location.state?.behaviorOnly])
-
-  // 启动面部采集
-  const startFaceCapture = async () => {
-    try {
-      // 初始化 MediaPipe
-      const mpReady = await initMediaPipe()
-      if (!mpReady) {
-        console.warn('[TaskPage] MediaPipe 不可用，跳过面部采集')
-        return
-      }
-
-      // 获取摄像头（后台静默，不显示视频）
-      const stream = await getCameraStream()
-      if (!stream) {
-        console.warn('[TaskPage] 摄像头不可用，跳过面部采集')
-        return
-      }
-      streamRef.current = stream
-
-      // 创建隐藏视频元素用于推理
-      if (!videoRef.current) {
-        const video = document.createElement('video')
-        video.srcObject = stream
-        video.play()
-        video.style.display = 'none'
-        document.body.appendChild(video)
-        videoRef.current = video
-      }
-
-      // 开始追踪
-      await startTracking(videoRef.current, (result) => {
-        // 降采样存储：每 200ms 存一帧
-        const now = Date.now()
-        if (now - lastFaceCaptureRef.current > 200) {
-          lastFaceCaptureRef.current = now
-          saveFrame(sessionId, result)
-        }
-      })
-    } catch (err) {
-      console.error('[TaskPage] 面部采集启动失败:', err)
-    }
-  }
 
   const submitPayload = useCallback(async (payload) => {
     setSubmitting(true)

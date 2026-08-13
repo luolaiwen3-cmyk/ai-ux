@@ -13,7 +13,6 @@ export default function ReplayViewport({ currentTime, mouseTrail, clickEvents, d
   const playerRef = useRef(null)
   const [hasRealData, setHasRealData] = useState(false)
   const [realEvents, setRealEvents] = useState([])
-  const [playerDuration, setPlayerDuration] = useState(duration * 1000)
   const [faceFrames, setFaceFrames] = useState([])
   const lastGotoRef = useRef(0) // 记录上次 goto 的时间，避免重复 seek
 
@@ -64,16 +63,7 @@ export default function ReplayViewport({ currentTime, mouseTrail, clickEvents, d
     if (playing) {
       // 开始播放：从当前位置开始
       playerRef.current.play()
-    } else {
-      // 暂停播放
-      playerRef.current.pause()
-      // 同步到目标位置（用户拖拽时）
-      const targetMs = currentTime * 1000
-      if (Math.abs(targetMs - lastGotoRef.current) > 50) {
-        lastGotoRef.current = targetMs
-        playerRef.current.goto(targetMs)
-      }
-    }
+    } else playerRef.current.pause()
   }, [playing, hasRealData])
 
   useEffect(() => {
@@ -108,9 +98,6 @@ export default function ReplayViewport({ currentTime, mouseTrail, clickEvents, d
       playerRef.current.goto(targetMs)
     }
   }, [currentTime, playing, hasRealData])
-
-  // 弹窗是否可见（3.5s 出现，15s 决策后消失）
-  const showPopup = currentTime >= 3.5 && currentTime < 15
 
   // 如果有真实数据，使用 rrweb 回放
   if (hasRealData && realEvents.length > 0) {

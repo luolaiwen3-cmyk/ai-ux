@@ -41,7 +41,7 @@ const RrwebPlayer = forwardRef(function RrwebPlayer(
   const outerRef = useRef(null)
   const replayerRef = useRef(null)
   const scaleRef = useRef(1)
-  const [scale, setScale] = useState(1)
+  const [, setScale] = useState(1)
   const [duration, setDuration] = useState(0)
   const [ready, setReady] = useState(false)
   const [error, setError] = useState(null)
@@ -93,7 +93,7 @@ const RrwebPlayer = forwardRef(function RrwebPlayer(
       // rrweb Replayer 内部状态：PAUSED=0, PLAYING=1
       return replayerRef.current?.timer.state === 1
     }
-  }), [ready, duration])
+  }), [duration])
 
   // 自适应缩放：根据父容器大小计算 scale，外层 div 尺寸跟随缩放后的内容
   useEffect(() => {

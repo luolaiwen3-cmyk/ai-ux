@@ -11,7 +11,6 @@ import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision'
 let faceLandmarker = null
 let videoElement = null
 let isRunning = false
-let lastCaptureTime = 0
 let onResultCallback = null
 
 // 配置
@@ -127,7 +126,6 @@ export const startTracking = async (video, onResult) => {
   videoElement = video
   onResultCallback = onResult || null
   isRunning = true
-  lastCaptureTime = 0
 
   // 确保视频在播放
   if (video.paused) {
@@ -153,7 +151,6 @@ export const stopTracking = () => {
 const detectFrame = () => {
   if (!isRunning || !videoElement || !faceLandmarker) return
 
-  const now = performance.now()
   const timestamp = Date.now()
 
   // 只在视频有数据时推理
@@ -190,7 +187,7 @@ const detectFrame = () => {
           })
         }
       }
-    } catch (err) {
+    } catch {
       // 推理错误不影响后续帧
     }
   }

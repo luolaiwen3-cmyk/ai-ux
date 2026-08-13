@@ -127,7 +127,7 @@ export const getStressData = (sessionId) => {
   }
 
   const baseTime = frames[0].t
-  return frames.map((f, i) => ({
+  return frames.map((f) => ({
     t: Number(((f.t - baseTime) / 1000).toFixed(2)),
     stress: Number((f.emotion?.value || 0.1).toFixed(3))
   }))

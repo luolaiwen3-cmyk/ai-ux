@@ -10,7 +10,6 @@ let stopFn = null
 let events = []
 let onEventCallback = null
 let autoStopTimer = null
-let maxEventsTimer = null
 
 // 安全限制配置
 const SAFETY_LIMITS = {

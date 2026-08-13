@@ -13,7 +13,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "start": "node server/index.js",
-    "test": "node --test"
+    "test": "node --test",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^1.0.1",
@@ -25,8 +26,12 @@
     "rrweb-player": "^2.1.1"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
+    "eslint": "^10.8.1",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.11.0",
     "jsdom": "^29.1.1",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
