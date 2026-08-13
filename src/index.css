@@ -141,3 +141,44 @@ body {
   background-size: 200% 100%;
   animation: shimmer 1.6s linear infinite;
 }
+
+/* 报告导出：浏览器打印对话框可直接另存为 PDF。 */
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
+  html,
+  body,
+  #root {
+    height: auto;
+    background: #070a0f;
+  }
+
+  aside,
+  .print-hidden,
+  .bg-grid {
+    display: none !important;
+  }
+
+  .h-screen {
+    height: auto !important;
+  }
+
+  .overflow-y-auto {
+    overflow: visible !important;
+  }
+
+  .report-page {
+    padding: 0 !important;
+  }
+
+  .report-print-area {
+    max-width: none;
+    border: 0;
+    box-shadow: none;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

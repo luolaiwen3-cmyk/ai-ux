@@ -7,25 +7,27 @@ import AnalystLayout from '../../components/shared/AnalystLayout.jsx'
  */
 export default function ReportPage() {
   const { id } = useParams()
-  const [exporting, setExporting] = useState(false)
   const [copied, setCopied] = useState(false)
 
   const handleExport = () => {
-    setExporting(true)
-    setTimeout(() => setExporting(false), 2000)
+    window.print()
   }
 
-  const handleCopyLink = () => {
-    navigator.clipboard?.writeText(`https://demo.insightux.io/report/${id}`)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      setCopied(false)
+    }
   }
 
   return (
     <AnalystLayout>
-      <div className="p-6">
+      <div className="report-page p-6">
         {/* 页头 */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="print-hidden flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <Link
               to="/sessions"
@@ -48,17 +50,16 @@ export default function ReportPage() {
             </button>
             <button
               onClick={handleExport}
-              disabled={exporting}
-              className="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-glow/90 to-cyan-soft/90 text-ink-900 text-xs font-semibold hover:shadow-glow transition-all disabled:opacity-50"
+              className="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-glow/90 to-cyan-soft/90 text-ink-900 text-xs font-semibold hover:shadow-glow transition-all"
             >
-              {exporting ? '导出中…' : '📄 导出 PDF'}
+              📄 导出 PDF
             </button>
           </div>
         </div>
 
         {/* 报告内容 */}
         <div className="max-w-2xl mx-auto">
-          <div className="glass rounded-xl p-8">
+          <div className="report-print-area glass rounded-xl p-8">
             {/* 报告头 */}
             <div className="text-center pb-6 border-b border-cyan-glow/10">
               <div className="text-[10px] font-mono text-slate-500 tracking-widest mb-2">
