@@ -9,12 +9,13 @@ import { loadFrames } from '../../lib/mediaPipeTracker.js'
  * 优先使用 rrweb 真实录制数据回放，降级到 mock 轨迹
  * + MediaPipe 面部视频帧回放
  */
-export default function ReplayViewport({ currentTime, mouseTrail, clickEvents, duration, sessionId }) {
+export default function ReplayViewport({ currentTime, mouseTrail, clickEvents, duration, sessionId, playing, onTimeUpdate }) {
   const playerRef = useRef(null)
   const [hasRealData, setHasRealData] = useState(false)
   const [realEvents, setRealEvents] = useState([])
   const [playerDuration, setPlayerDuration] = useState(duration * 1000)
   const [faceFrames, setFaceFrames] = useState([])
+  const lastGotoRef = useRef(0) // 记录上次 goto 的时间，避免重复 seek
 
   // 加载面部帧数据
   useEffect(() => {
@@ -46,31 +47,61 @@ export default function ReplayViewport({ currentTime, mouseTrail, clickEvents, d
   useEffect(() => {
     const events = loadFromStorage(sessionId)
     if (events && events.length > 0) {
-      // 验证数据完整性：首事件必须是 FullSnapshot (type=0)
-      const firstEvent = events[0]
-      if (firstEvent && firstEvent.type === 0) {
-        setRealEvents(events)
-        setHasRealData(true)
-        console.log('[ReplayViewport] 真实数据加载成功:', events.length, '个事件')
-      } else {
-        console.warn('[ReplayViewport] 数据格式异常，首事件类型:', firstEvent?.type)
-        // 尝试查找 FullSnapshot
-        const snapshotIdx = events.findIndex(e => e.type === 0)
-        if (snapshotIdx >= 0) {
-          console.log('[ReplayViewport] 找到 FullSnapshot 在位置:', snapshotIdx)
-          setRealEvents(events)
-          setHasRealData(true)
-        }
-      }
+      // 只要有事件就认为是真实数据（不再严格检查首事件类型）
+      setRealEvents(events)
+      setHasRealData(true)
+      console.log('[ReplayViewport] 真实数据加载成功:', events.length, '个事件, 首事件类型:', events[0]?.type)
+    } else {
+      console.log('[ReplayViewport] 无真实数据，使用 mock')
     }
   }, [sessionId])
 
-  // 同步播放位置
+  // 播放控制：播放时用 play()，暂停/拖拽时用 goto()
+  // 避免每帧调用 goto() 导致 DOM 重建跟不上和 AbortError
   useEffect(() => {
-    if (hasRealData && playerRef.current) {
-      playerRef.current.goto(currentTime * 1000)
+    if (!hasRealData || !playerRef.current || playerRef.current.getDuration() <= 0) return
+
+    if (playing) {
+      // 开始播放：从当前位置开始
+      playerRef.current.play()
+    } else {
+      // 暂停播放
+      playerRef.current.pause()
+      // 同步到目标位置（用户拖拽时）
+      const targetMs = currentTime * 1000
+      if (Math.abs(targetMs - lastGotoRef.current) > 50) {
+        lastGotoRef.current = targetMs
+        playerRef.current.goto(targetMs)
+      }
     }
-  }, [currentTime, hasRealData])
+  }, [playing, hasRealData])
+
+  // 播放时，定期从 replayer 读取当前时间同步给父组件
+  useEffect(() => {
+    if (!playing || !hasRealData || !playerRef.current) return
+
+    const timer = setInterval(() => {
+      if (playerRef.current && onTimeUpdate) {
+        const t = playerRef.current.getTime()
+        if (t !== undefined && t !== null) {
+          onTimeUpdate(t / 1000) // 转回秒
+        }
+      }
+    }, 100) // 10fps 同步足够
+
+    return () => clearInterval(timer)
+  }, [playing, hasRealData, onTimeUpdate])
+
+  // 非播放状态下，响应用户拖拽跳转
+  useEffect(() => {
+    if (playing || !hasRealData || !playerRef.current || playerRef.current.getDuration() <= 0) return
+
+    const targetMs = currentTime * 1000
+    if (Math.abs(targetMs - lastGotoRef.current) > 50) {
+      lastGotoRef.current = targetMs
+      playerRef.current.goto(targetMs)
+    }
+  }, [currentTime, playing, hasRealData])
 
   // 弹窗是否可见（3.5s 出现，15s 决策后消失）
   const showPopup = currentTime >= 3.5 && currentTime < 15
@@ -101,8 +132,8 @@ export default function ReplayViewport({ currentTime, mouseTrail, clickEvents, d
           </div>
         </div>
 
-        {/* rrweb 回放区 */}
-        <div className="flex-1 min-h-0 rounded-lg border border-cyan-glow/10 overflow-hidden bg-white">
+        {/* rrweb 回放区 — 居中自适应 */}
+        <div className="flex-1 min-h-0 rounded-lg border border-cyan-glow/10 overflow-hidden bg-slate-800/50 flex items-center justify-center">
           <RrwebPlayer ref={playerRef} events={realEvents} />
         </div>
 

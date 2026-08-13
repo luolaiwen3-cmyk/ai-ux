@@ -4,6 +4,7 @@
  * 含安全截断机制，防止内存溢出导致页面卡死
  */
 import { record } from 'rrweb'
+import { snapshot } from 'rrweb-snapshot'
 
 let stopFn = null
 let events = []
@@ -89,16 +90,16 @@ export const startRecording = (onEvent, maxDuration) => {
     maskTextSensitive: true,
     maskAllInputs: true,
     blockSelector: '[data-no-record], .animate-ping, .animate-blink, .animate-spin, .animate-scan, [class*="animate-"]',
-    // 性能优化：只录制必要的 mutation
+    // 采样配置（更高的频率 = 更流畅的回放）
     sampling: {
-      mousemove: 200,      // 鼠标移动降采样（每 200ms 最多一次，避免事件爆炸）
-      mouseInteraction: true,  // 鼠标交互全量（点击、拖拽等）
-      scroll: 150,         // 滚动降采样
-      input: 'last',       // 输入只录最终值
-      media: 800           // 媒体事件降采样
+      mousemove: 50,       // 每 50ms 一次鼠标位置（20fps，更流畅）
+      mouseInteraction: true,  // 鼠标交互全量
+      scroll: 100,         // 每 100ms 一次滚动
+      input: 'last',
+      media: 800
     },
-    // 压缩 DOM 快照
-    checkoutEveryNms: 10000  // 每 10s 生成一个完整快照（减少快照频率）
+    // 每 5s 生成一个 FullSnapshot（确保短录制也有快照）
+    checkoutEveryNms: 5000
   })
 
   return events
@@ -169,6 +170,21 @@ export const getDuration = () => {
  */
 export const saveToStorage = (sessionId = 'default-session') => {
   try {
+    // 如果没有 FullSnapshot，手动捕获一个
+    if (events.length > 0 && !events.some(e => e.type === 0)) {
+      const domSnapshot = snapshot(document)
+      if (domSnapshot) {
+        events.unshift({
+          type: 0,
+          timestamp: events[0].timestamp - 1,
+          data: {
+            node: domSnapshot,
+            initialOffset: { left: window.scrollX, top: window.scrollY }
+          }
+        })
+      }
+    }
+
     const key = `rrweb-events-${sessionId}`
     localStorage.setItem(key, JSON.stringify(events))
 

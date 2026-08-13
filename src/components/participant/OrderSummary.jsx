@@ -1,6 +1,6 @@
 import React from 'react'
 
-export default function OrderSummary({ selectedCount, couponApplied }) {
+export default function OrderSummary({ selectedCount, couponApplied, onSubmit }) {
   const subtotal = 12497
   const discount = couponApplied ? 50 : 0
   const shipping = 0
@@ -49,7 +49,10 @@ export default function OrderSummary({ selectedCount, couponApplied }) {
       </div>
 
       <div className="px-5 pb-5">
-        <button className="w-full py-3 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-semibold text-sm transition-colors shadow-sm">
+        <button
+          onClick={onSubmit}
+          className="w-full py-3 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-semibold text-sm transition-colors shadow-sm"
+        >
           提交订单
         </button>
         <p className="text-[10px] text-slate-400 text-center mt-2">

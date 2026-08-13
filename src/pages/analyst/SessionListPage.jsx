@@ -1,115 +1,45 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import AnalystLayout from '../../components/shared/AnalystLayout.jsx'
-import { getSessionIndex } from '../../lib/rrwebRecorder.js'
+import { getSessionList } from '../../lib/sessionDataService.js'
 
 /**
  * A2 会话列表 —— 所有被试会话总览，支持筛选/排序
- * 优先从 localStorage 读取真实录制会话，降级到 mock 数据
+ * 完全使用真实数据
  */
 export default function SessionListPage() {
-  const [filter, setFilter] = useState('all') // all | p0 | p1 | completed | reviewing
-  const [realSessions, setRealSessions] = useState([])
+  const [filter, setFilter] = useState('all') // all | p0 | p1 | completed | face
+  const [sessions, setSessions] = useState([])
 
   // 从 localStorage 读取真实录制会话
   useEffect(() => {
-    const index = getSessionIndex()
-    if (index.length > 0) {
-      const sessions = index.map(s => ({
-        id: s.id,
-        task: '电商结算页优惠券弹窗测试',
-        participant: 'P-Real',
-        duration: `${(s.duration / 1000).toFixed(1)}s`,
-        status: 'completed',
-        severity: 'P0',
-        issue: '待分析（rrweb 真实录制）',
-        createdAt: new Date(s.savedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-        hasReport: false,
-        eventCount: s.eventCount,
-        isReal: true
-      }))
-      setRealSessions(sessions)
-    }
+    const list = getSessionList()
+    const formatted = list.map((s, i) => ({
+      id: s.id,
+      task: '电商结算页优惠券弹窗测试',
+      participant: `P-${String(i + 1).padStart(3, '0')}`,
+      duration: s.duration ? `${(s.duration / 1000).toFixed(1)}s` : '0s',
+      status: 'completed',
+      severity: s.hasFace && s.lastEmotion?.value > 0.7 ? 'P0' : 'P1',
+      issue: s.hasFace
+        ? `检测到 ${s.lastEmotion?.label || '未知'} 情绪`
+        : '行为录制（无面部数据）',
+      createdAt: new Date(s.savedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+      hasReport: false,
+      eventCount: s.eventCount,
+      frameCount: s.frameCount,
+      hasFace: s.hasFace,
+      lastEmotion: s.lastEmotion
+    }))
+    setSessions(formatted)
   }, [])
 
-  const mockSessions = [
-    {
-      id: 'UX-0812-0037',
-      task: '电商结算页优惠券弹窗测试',
-      participant: 'P-042',
-      duration: '20.0s',
-      status: 'completed',
-      severity: 'P0',
-      issue: '优惠券弹窗双按钮文案歧义',
-      createdAt: '13:21',
-      hasReport: true
-    },
-    {
-      id: 'UX-0812-0036',
-      task: '电商结算页优惠券弹窗测试',
-      participant: 'P-041',
-      duration: '18.5s',
-      status: 'completed',
-      severity: 'P1',
-      issue: '结算按钮位置不易发现',
-      createdAt: '13:15',
-      hasReport: true
-    },
-    {
-      id: 'UX-0812-0035',
-      task: '电商结算页优惠券弹窗测试',
-      participant: 'P-040',
-      duration: '22.1s',
-      status: 'reviewing',
-      severity: 'P0',
-      issue: '待分析',
-      createdAt: '13:08',
-      hasReport: false
-    },
-    {
-      id: 'UX-0812-0034',
-      task: '注册流程简化测试',
-      participant: 'P-039',
-      duration: '45.3s',
-      status: 'completed',
-      severity: 'P2',
-      issue: '表单字段过多导致放弃',
-      createdAt: '12:55',
-      hasReport: true
-    },
-    {
-      id: 'UX-0812-0033',
-      task: '注册流程简化测试',
-      participant: 'P-038',
-      duration: '38.7s',
-      status: 'completed',
-      severity: 'P1',
-      issue: '验证码输入体验差',
-      createdAt: '12:48',
-      hasReport: true
-    },
-    {
-      id: 'UX-0811-0032',
-      task: '电商结算页优惠券弹窗测试',
-      participant: 'P-037',
-      duration: '16.2s',
-      status: 'completed',
-      severity: 'P0',
-      issue: '优惠券弹窗双按钮文案歧义',
-      createdAt: '18:32',
-      hasReport: true
-    }
-  ]
-
-  // 合并真实会话和 mock 会话，真实会话排在前面
-  const allSessions = [...realSessions, ...mockSessions]
-
-  const filteredSessions = allSessions.filter((s) => {
+  const filteredSessions = sessions.filter((s) => {
     if (filter === 'all') return true
     if (filter === 'p0') return s.severity === 'P0'
     if (filter === 'p1') return s.severity === 'P1'
     if (filter === 'completed') return s.status === 'completed'
-    if (filter === 'reviewing') return s.status === 'reviewing'
+    if (filter === 'face') return s.hasFace
     return true
   })
 
@@ -124,6 +54,34 @@ export default function SessionListPage() {
     reviewing: { label: '分析中', color: 'text-warn' }
   }
 
+  // 空状态
+  if (sessions.length === 0) {
+    return (
+      <AnalystLayout>
+        <div className="p-6">
+          <h1 className="text-lg font-semibold text-slate-100 mb-6">会话列表</h1>
+          <div className="glass rounded-xl p-12 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-ink-700/60 border border-cyan-glow/15 flex items-center justify-center mx-auto mb-4">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                <path d="M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="#22E6C8" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <div className="text-sm text-slate-300 font-medium">暂无录制会话</div>
+            <p className="text-xs text-slate-500 mt-2 max-w-[300px] mx-auto">
+              请先让被试完成测试任务，录制数据会自动显示在这里
+            </p>
+            <Link
+              to="/tasks"
+              className="inline-block mt-4 px-4 py-2 rounded-lg bg-cyan-glow/15 border border-cyan-glow/25 text-cyan-glow text-xs font-medium hover:bg-cyan-glow/25 transition-colors"
+            >
+              创建测试任务 →
+            </Link>
+          </div>
+        </div>
+      </AnalystLayout>
+    )
+  }
+
   return (
     <AnalystLayout>
       <div className="p-6">
@@ -131,7 +89,10 @@ export default function SessionListPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-lg font-semibold text-slate-100">会话列表</h1>
-            <p className="text-xs text-slate-500 mt-0.5">共 {allSessions.length} 个会话 · {allSessions.filter((s) => s.severity === 'P0').length} 个 P0 问题 · <span className="text-emerald-400">{realSessions.length} 个真实录制</span></p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              共 {sessions.length} 个会话 · {sessions.filter(s => s.severity === 'P0').length} 个 P0 问题 ·
+              <span className="text-emerald-400"> {sessions.filter(s => s.hasFace).length} 个含面部数据</span>
+            </p>
           </div>
         </div>
 
@@ -141,8 +102,7 @@ export default function SessionListPage() {
             { key: 'all', label: '全部' },
             { key: 'p0', label: 'P0 紧急' },
             { key: 'p1', label: 'P1 重要' },
-            { key: 'reviewing', label: '分析中' },
-            { key: 'completed', label: '已完成' }
+            { key: 'face', label: '含面部数据' }
           ].map((f) => (
             <button
               key={f.key}
@@ -180,10 +140,13 @@ export default function SessionListPage() {
                     </span>
                     <span className="text-[10px] text-slate-500">·</span>
                     <span className="text-[11px] text-slate-400">{s.participant}</span>
-                    <span
-                      className={`text-[10px] font-mono ${statusLabels[s.status].color}`}
-                    >
-                      ● {statusLabels[s.status].label}
+                    {s.hasFace && (
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                        FACE
+                      </span>
+                    )}
+                    <span className={`text-[10px] font-mono ${statusLabels[s.status]?.color || 'text-slate-500'}`}>
+                      ● {statusLabels[s.status]?.label || s.status}
                     </span>
                   </div>
                   <div className="text-[11px] text-slate-500 mt-0.5 truncate">
@@ -194,10 +157,9 @@ export default function SessionListPage() {
                 {/* 元信息 */}
                 <div className="flex items-center gap-4 shrink-0 text-[10px] font-mono text-slate-500">
                   <span>{s.duration}</span>
+                  <span>{s.eventCount}e</span>
+                  {s.hasFace && <span>{s.frameCount}f</span>}
                   <span>{s.createdAt}</span>
-                  {s.hasReport && (
-                    <span className="text-emerald-400">报告 ✓</span>
-                  )}
                 </div>
 
                 {/* 箭头 */}

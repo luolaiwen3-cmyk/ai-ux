@@ -14,7 +14,7 @@ export default function CouponPopup({ onDecision }) {
       />
 
       {/* 弹窗主体 */}
-      <div className="relative w-[340px] rounded-2xl bg-white shadow-2xl overflow-hidden animate-[popIn_.3s_ease-out]">
+      <div className="relative w-[340px] rounded-2xl bg-white shadow-2xl overflow-hidden">
         {/* 顶部渐变区 */}
         <div className="relative h-28 bg-gradient-to-br from-amber-400 via-orange-400 to-rose-500 flex items-center justify-center">
           <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_30%_20%,white,transparent)]" />

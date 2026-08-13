@@ -6,9 +6,10 @@ import StressChart from '../../components/researcher/StressChart.jsx'
 import Timeline from '../../components/researcher/Timeline.jsx'
 import BehaviorCards from '../../components/researcher/BehaviorCards.jsx'
 import DiagnosisPanel from '../../components/researcher/DiagnosisPanel.jsx'
-import { mouseTrail, clickEvents, timelineEvents, stressData, behaviorStats, sessionMeta } from '../../data/sessionData.js'
-import { loadFromStorage, hasStoredSession, getSessionIndex } from '../../lib/rrwebRecorder.js'
+import { mouseTrail, clickEvents, timelineEvents, stressData, sessionMeta } from '../../data/sessionData.js'
+import { loadFromStorage, hasStoredSession } from '../../lib/rrwebRecorder.js'
 import { loadFrames, hasFaceData } from '../../lib/mediaPipeTracker.js'
+import { getSessionMetrics, getStressData } from '../../lib/sessionDataService.js'
 
 /**
  * A3 单会话深度分析 —— 核心页面
@@ -23,16 +24,25 @@ export default function SessionDetailPage() {
   const [useRealData, setUseRealData] = useState(false)
   const [faceFrames, setFaceFrames] = useState([])
   const [hasFace, setHasFace] = useState(false)
+  const [metrics, setMetrics] = useState(null)
+  const [realStressData, setRealStressData] = useState(null)
   const duration = 20
   const rafRef = useRef(null)
   const lastTimeRef = useRef(null)
+  const playerDrivingRef = useRef(false) // 标记是否由 rrweb player 驱动时间
 
-  // 检查是否有真实录制数据
+  // 加载真实数据
   useEffect(() => {
-    // 检查当前会话或任意会话
+    // 检查是否有 rrweb 录制数据
     const hasData = hasStoredSession(id) || hasStoredSession()
     setUseRealData(hasData)
     console.log('[SessionDetail] 会话ID:', id, '有数据:', hasData)
+
+    // 加载行为指标
+    const m = getSessionMetrics(id)
+    if (m) {
+      setMetrics(m)
+    }
 
     // 加载面部帧数据
     const frames = loadFrames(id)
@@ -41,10 +51,27 @@ export default function SessionDetailPage() {
       setHasFace(true)
       console.log('[SessionDetail] 面部帧数:', frames.length)
     }
+
+    // 生成压力曲线（从 MediaPipe 情绪数据）
+    const stress = getStressData(id)
+    if (stress) {
+      setRealStressData(stress)
+    }
   }, [id])
 
+  // rrweb player 驱动时间更新（播放时由 replayer 回调）
+  const handlePlayerTimeUpdate = useCallback((t) => {
+    playerDrivingRef.current = true
+    setCurrentTime(t)
+    if (t >= duration) {
+      setPlaying(false)
+    }
+  }, [duration])
+
+  // 本地时钟驱动（无真实数据或 mock 模式时使用）
   const animate = useCallback(
     (timestamp) => {
+      if (playerDrivingRef.current) return // player 驱动时跳过本地时钟
       if (lastTimeRef.current === null) lastTimeRef.current = timestamp
       const delta = (timestamp - lastTimeRef.current) / 1000
       lastTimeRef.current = timestamp
@@ -66,6 +93,7 @@ export default function SessionDetailPage() {
   useEffect(() => {
     if (playing) {
       lastTimeRef.current = null
+      playerDrivingRef.current = false
       rafRef.current = requestAnimationFrame(animate)
     } else if (rafRef.current) {
       cancelAnimationFrame(rafRef.current)
@@ -128,6 +156,8 @@ export default function SessionDetailPage() {
               clickEvents={clickEvents}
               duration={duration}
               sessionId={id || sessionMeta.id}
+              playing={playing}
+              onTimeUpdate={handlePlayerTimeUpdate}
             />
             <Timeline
               currentTime={currentTime}
@@ -143,9 +173,9 @@ export default function SessionDetailPage() {
 
           {/* 右侧 40%：数据 + 报告 */}
           <div className="lg:col-span-5 flex flex-col gap-4 min-h-0 overflow-y-auto">
-            <BehaviorCards stats={behaviorStats} meta={sessionMeta} />
+            <BehaviorCards stats={metrics} meta={{ id, task: '电商结算页优惠券弹窗测试' }} />
             {hasFace && <FaceDataCard frames={faceFrames} currentTime={currentTime} />}
-            <StressChart data={stressData} currentTime={currentTime} duration={duration} />
+            <StressChart data={realStressData || stressData} currentTime={currentTime} duration={duration} />
             <DiagnosisPanel />
           </div>
         </div>
