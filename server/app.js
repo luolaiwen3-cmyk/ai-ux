@@ -106,10 +106,8 @@ export function createApp({ config, database: suppliedDatabase, logger, apiOnly 
     done()
   })
   app.register(siteRoutes)
-  if (!apiOnly) {
-    const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-    app.register(registerApplicationAssets, { distDir: path.join(rootDir, 'dist') })
-  }
+  const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+  app.register(registerApplicationAssets, { distDir: path.join(rootDir, 'dist'), apiOnly })
   if (!config.isProduction) {
     app.register(swaggerUi, { routePrefix: '/docs' })
   }

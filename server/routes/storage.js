@@ -1,4 +1,4 @@
-import { existsSync, statSync } from 'node:fs'
+import { createReadStream, existsSync, statSync } from 'node:fs'
 import path from 'node:path'
 import fastifyStatic from '@fastify/static'
 import { AppError, notFound } from '../errors.js'
@@ -28,8 +28,19 @@ export function siteRoutes(app, _options, done) {
   done()
 }
 
-export async function registerApplicationAssets(app, { distDir }) {
+export async function registerApplicationAssets(app, { distDir, apiOnly = false }) {
   if (!existsSync(distDir)) return
+  if (apiOnly) {
+    app.get('/insightux-recorder.js', async (_request, reply) => {
+      const sdk = path.join(distDir, 'insightux-recorder.js')
+      if (!existsSync(sdk)) throw notFound('SDK_NOT_FOUND', 'Recorder SDK 尚未构建')
+      return reply
+        .type('text/javascript; charset=utf-8')
+        .header('Cache-Control', 'no-cache')
+        .send(createReadStream(sdk))
+    })
+    return
+  }
   await app.register(fastifyStatic, {
     root: distDir,
     wildcard: false,
