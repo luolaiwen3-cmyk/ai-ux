@@ -149,6 +149,12 @@ export function createApiRouter({ store, config }) {
       if (body.faceFrames !== undefined && !Array.isArray(body.faceFrames)) {
         throw new HttpError(400, '面部帧格式无效', 'VALIDATION_ERROR')
       }
+      if ((body.events?.length || 0) > 10000) {
+        throw new HttpError(413, '行为事件超过 10000 条上限', 'EVENT_LIMIT_EXCEEDED')
+      }
+      if ((body.faceFrames?.length || 0) > 600) {
+        throw new HttpError(413, '面部帧超过 600 条上限', 'FRAME_LIMIT_EXCEEDED')
+      }
       const session = store.completeSession(id, body)
       sendJson(response, 200, { session })
       return true

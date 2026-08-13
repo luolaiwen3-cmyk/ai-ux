@@ -410,3 +410,15 @@ export const getFaceSessionIndex = () => {
     return []
   }
 }
+
+/** 删除指定会话的面部数据和索引。 */
+export const deleteFaceSession = (sessionId) => {
+  try {
+    localStorage.removeItem(`mediapipe-frames-${sessionId}`)
+    const index = getFaceSessionIndex().filter((session) => session.id !== sessionId)
+    localStorage.setItem('mediapipe-session-index', JSON.stringify(index))
+    return true
+  } catch {
+    return false
+  }
+}

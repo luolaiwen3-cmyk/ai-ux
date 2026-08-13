@@ -35,7 +35,7 @@ export default function ThanksPage() {
               <ul className="text-xs text-slate-500 space-y-1.5">
                 <li>· 无需再进行任何操作</li>
                 <li>· 关闭浏览器标签即可离开</li>
-                <li>· 原始摄像头画面不会被保存</li>
+                <li>· 不保存连续原始视频；分析端仅保留低清缩略图和面部特征</li>
               </ul>
             </div>
           </div>

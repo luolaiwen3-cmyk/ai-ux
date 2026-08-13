@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import CheckoutPage from '../../components/participant/CheckoutPage.jsx'
-import { startRecording, stopRecording, saveToStorage } from '../../lib/rrwebRecorder.js'
-import { initMediaPipe, getCameraStream, startTracking, stopTracking, saveFrame } from '../../lib/mediaPipeTracker.js'
-import { loadFrames } from '../../lib/mediaPipeTracker.js'
+import { startRecording, stopRecording, saveToStorage, deleteSession } from '../../lib/rrwebRecorder.js'
+import { initMediaPipe, getCameraStream, startTracking, stopTracking, saveFrame, loadFrames, deleteFaceSession } from '../../lib/mediaPipeTracker.js'
 import { api, clearParticipantSession, getParticipantToken } from '../../lib/apiClient.js'
 
 /**
@@ -22,6 +21,7 @@ export default function TaskPage() {
   const [couponDecision, setCouponDecision] = useState('none')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const [sessionReady, setSessionReady] = useState(false)
   const recordingRef = useRef(false)
   const pendingPayloadRef = useRef(null)
   const eventCountRef = useRef(0)
@@ -29,7 +29,7 @@ export default function TaskPage() {
   const streamRef = useRef(null)
   const lastFaceCaptureRef = useRef(0)
 
-  // 页面加载时开始录制 + 面部采集
+  // 先校验匿名会话凭证，再开始任何采集。
   useEffect(() => {
     let cancelled = false
     if (!getParticipantToken(sessionId)) {
@@ -44,10 +44,18 @@ export default function TaskPage() {
           navigate('/thanks', { replace: true })
           return
         }
+        setSessionReady(true)
       })
       .catch(() => {
         if (!cancelled) navigate('/', { replace: true })
       })
+
+    return () => { cancelled = true }
+  }, [sessionId, navigate])
+
+  // 会话通过服务端校验后开始录制 + 面部采集。
+  useEffect(() => {
+    if (!sessionReady) return undefined
 
     // 1. 开始 rrweb 录制
     const onEvent = (event) => {
@@ -74,7 +82,6 @@ export default function TaskPage() {
     return () => {
       clearInterval(timer)
       // 停止录制并保存
-      cancelled = true
       if (recordingRef.current) stopRecording()
       // 停止面部采集
       stopTracking()
@@ -87,7 +94,7 @@ export default function TaskPage() {
         videoRef.current = null
       }
     }
-  }, [sessionId, navigate, location.state?.behaviorOnly])
+  }, [sessionId, sessionReady, location.state?.behaviorOnly])
 
   // 启动面部采集
   const startFaceCapture = async () => {
@@ -137,6 +144,8 @@ export default function TaskPage() {
     try {
       await api.participant.completeSession(sessionId, payload)
       pendingPayloadRef.current = null
+      deleteSession(sessionId)
+      deleteFaceSession(sessionId)
       clearParticipantSession(sessionId)
       navigate('/thanks', { replace: true })
     } catch (error) {
@@ -180,8 +189,8 @@ export default function TaskPage() {
     try {
       await api.participant.abandonSession(sessionId)
     } finally {
-      localStorage.removeItem(`rrweb-events-${sessionId}`)
-      localStorage.removeItem(`mediapipe-frames-${sessionId}`)
+      deleteSession(sessionId)
+      deleteFaceSession(sessionId)
       clearParticipantSession(sessionId)
       navigate('/', { replace: true })
     }

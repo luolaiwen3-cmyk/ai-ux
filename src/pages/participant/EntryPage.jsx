@@ -109,6 +109,21 @@ export default function EntryPage() {
     }
   }
 
+  const handleBehaviorOnly = async () => {
+    setCreating(true)
+    setPageError('')
+    try {
+      const result = await api.participant.createSession(token)
+      saveParticipantSession(result.session)
+      await api.participant.startSession(result.session.id)
+      stopDevices()
+      navigate(`/task/${result.session.id}`, { state: { behaviorOnly: true } })
+    } catch (error) {
+      setPageError(error.message)
+      setCreating(false)
+    }
+  }
+
   if (loadingTask) return <ParticipantState title="正在验证测试链接…" />
   if (!task) return <ParticipantState title="无法开始测试" detail={pageError || '测试链接无效或任务已暂停'} tone="error" />
 
@@ -191,7 +206,10 @@ export default function EntryPage() {
                   <CheckItem label="摄像头权限" status={checks.camera} />
                   <CheckItem label="MediaPipe 面部检测" status={checks.face} />
                 </div>
-                <button onClick={startDeviceCheck} className="primary-button">重新检测</button>
+                <div className="space-y-2">
+                  <button onClick={startDeviceCheck} className="primary-button">重新检测</button>
+                  <button onClick={handleBehaviorOnly} disabled={creating} className="secondary-button disabled:opacity-50">{creating ? '正在创建会话…' : '确认仅记录页面行为'}</button>
+                </div>
               </div>
             )}
           </div>
