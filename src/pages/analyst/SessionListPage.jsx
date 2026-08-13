@@ -11,10 +11,10 @@ export default function SessionListPage() {
   const [filter, setFilter] = useState('all') // all | p0 | p1 | completed | face
   const [sessions, setSessions] = useState([])
 
-  // 从 localStorage 读取真实录制会话
-  useEffect(() => {
+  // 格式化会话数据
+  const formatSessions = () => {
     const list = getSessionList()
-    const formatted = list.map((s, i) => ({
+    return list.map((s, i) => ({
       id: s.id,
       task: '电商结算页优惠券弹窗测试',
       participant: `P-${String(i + 1).padStart(3, '0')}`,
@@ -31,7 +31,41 @@ export default function SessionListPage() {
       hasFace: s.hasFace,
       lastEmotion: s.lastEmotion
     }))
-    setSessions(formatted)
+  }
+
+  // 初始加载
+  useEffect(() => {
+    setSessions(formatSessions())
+  }, [])
+
+  // 监听 localStorage 变化，自动刷新列表（跨标签页 + 同页面 storage 事件）
+  useEffect(() => {
+    const handleStorage = (e) => {
+      // 只关注 rrweb 和 mediapipe 相关的存储键
+      if (e.key && (e.key.startsWith('rrweb-') || e.key.startsWith('mediapipe-'))) {
+        setSessions(formatSessions())
+      }
+    }
+    window.addEventListener('storage', handleStorage)
+
+    // 同标签页内 rrweb 保存时，storage 事件不会触发，用轮询兜底
+    const timer = setInterval(() => {
+      const current = getSessionList()
+      setSessions((prev) => {
+        if (prev.length !== current.length) return formatSessions()
+        // 检查是否有新事件数变化
+        const hasChange = prev.some((s, i) => {
+          const curr = current[i]
+          return curr && (s.eventCount !== curr.eventCount || s.frameCount !== curr.frameCount)
+        })
+        return hasChange ? formatSessions() : prev
+      })
+    }, 2000)
+
+    return () => {
+      window.removeEventListener('storage', handleStorage)
+      clearInterval(timer)
+    }
   }, [])
 
   const filteredSessions = sessions.filter((s) => {

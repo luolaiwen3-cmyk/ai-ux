@@ -95,6 +95,9 @@ export default function DiagnosisPanel({ metrics = null, stressData = null, hasF
     }
   }, [metrics, stressData, hasFace])
 
+  // 提取徘徊次数（供案例匹配使用）
+  const backForth = metrics?.backAndForth || 0
+
   const handleDiagnose = () => {
     setDiagnosing(true)
     setDiagnosed(false)
@@ -224,15 +227,15 @@ export default function DiagnosisPanel({ metrics = null, stressData = null, hasF
             </ul>
           </div>
 
-          {/* 历史案例 */}
+          {/* 历史案例 —— 根据严重程度匹配不同案例集 */}
           <div className="rounded-lg border border-cyan-glow/15 bg-ink-800/60 p-3">
             <div className="text-[10px] font-mono text-slate-400 tracking-wide mb-2">
               SIMILAR_CASES · 匹配案例
             </div>
             <div className="flex flex-wrap gap-1.5">
-              <CaseTag id="0089" match="92%" />
-              <CaseTag id="0104" match="87%" />
-              <CaseTag id="0156" match="81%" />
+              {severityCases(diagnosis.severity, backForth).map((c) => (
+                <CaseTag key={c.id} id={c.id} match={c.match} />
+              ))}
             </div>
           </div>
         </div>
@@ -312,4 +315,29 @@ function CaseTag({ id, match }) {
       <span className="text-emerald-400">↑{match}</span>
     </span>
   )
+}
+
+/**
+ * 根据严重程度和徘徊次数匹配不同案例集
+ */
+function severityCases(severity, backForth) {
+  if (severity === 'P0') {
+    return [
+      { id: '0089', match: '94%' },
+      { id: '0104', match: '91%' },
+      { id: '0237', match: '87%' }
+    ]
+  }
+  if (backForth >= 2) {
+    return [
+      { id: '0156', match: '89%' },
+      { id: '0312', match: '84%' },
+      { id: '0078', match: '79%' }
+    ]
+  }
+  return [
+    { id: '0042', match: '82%' },
+    { id: '0183', match: '76%' },
+    { id: '0295', match: '71%' }
+  ]
 }
