@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import CheckoutPage from '../../components/participant/CheckoutPage.jsx'
 import { startRecording, stopRecording, saveToStorage } from '../../lib/rrwebRecorder.js'
 import { initMediaPipe, getCameraStream, startTracking, stopTracking, saveFrame } from '../../lib/mediaPipeTracker.js'
@@ -12,8 +12,8 @@ import { initMediaPipe, getCameraStream, startTracking, stopTracking, saveFrame 
  */
 export default function TaskPage() {
   const { sessionId } = useParams()
+  const navigate = useNavigate()
   const [recording, setRecording] = useState(false)
-  const [recordComplete, setRecordComplete] = useState(false)
   const [eventCount, setEventCount] = useState(0)
   const [stopReason, setStopReason] = useState(null)
   const [faceEmotion, setFaceEmotion] = useState(null)
@@ -58,6 +58,11 @@ export default function TaskPage() {
       stopTracking()
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((t) => t.stop())
+      }
+      if (videoRef.current) {
+        videoRef.current.srcObject = null
+        videoRef.current.remove()
+        videoRef.current = null
       }
     }
   }, [sessionId])
@@ -108,18 +113,16 @@ export default function TaskPage() {
     }
   }
 
-  // 任务完成（优惠券决策后）
+  // 任务完成（优惠券决策或时长到达）→ 保存后进入感谢页
   const handleTaskComplete = useCallback(() => {
+    if (!recordingRef.current) return
     const events = stopRecording()
     recordingRef.current = false
     setRecording(false)
-    setRecordComplete(true)
     setEventCount(events.length)
-
-    // 存储录制数据
     saveToStorage(sessionId)
-    console.log(`录制完成：${events.length} 个事件`)
-  }, [sessionId])
+    navigate('/thanks', { replace: true })
+  }, [sessionId, navigate])
 
   // 监听优惠券弹窗关闭 = 任务关键节点
   useEffect(() => {
@@ -158,13 +161,6 @@ export default function TaskPage() {
 
       {/* 真实的结算页 */}
       <CheckoutPage onDecision={handleTaskComplete} />
-
-      {/* 录制完成提示 */}
-      {recordComplete && (
-        <div className="fixed bottom-4 right-4 z-50 px-3 py-2 rounded-lg bg-emerald-500 text-white text-xs shadow-lg" data-no-record>
-          ✓ 录制完成 · {eventCount} 个事件已保存
-        </div>
-      )}
 
       {/* 截断提示 */}
       {stopReason && stopReason !== 'manual' && (

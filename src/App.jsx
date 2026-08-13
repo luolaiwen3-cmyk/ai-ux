@@ -5,6 +5,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import EntryPage from './pages/participant/EntryPage.jsx'
 import CalibratePage from './pages/participant/CalibratePage.jsx'
 import TaskPage from './pages/participant/TaskPage.jsx'
+import ThanksPage from './pages/participant/ThanksPage.jsx'
 
 // 分析人员端
 import DashboardPage from './pages/analyst/DashboardPage.jsx'
@@ -22,6 +23,7 @@ export default function App() {
         <Route path="/join/:token" element={<EntryPage />} />
         <Route path="/calibrate" element={<CalibratePage />} />
         <Route path="/task/:sessionId" element={<TaskPage />} />
+        <Route path="/thanks" element={<ThanksPage />} />
 
         {/* 分析人员端（需登录，此处简化） */}
         <Route path="/" element={<DashboardPage />} />
