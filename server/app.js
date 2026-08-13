@@ -7,6 +7,9 @@ import { openDatabase } from './database.js'
 import { AppError, unauthorized } from './errors.js'
 import { createRepositories } from './repositories.js'
 import { authRoutes } from './routes/auth.js'
+import { participantRoutes } from './routes/participant.js'
+import { sessionRoutes } from './routes/sessions.js'
+import { taskRoutes } from './routes/tasks.js'
 import { createServices } from './services.js'
 
 const runtimeLogger = {
@@ -54,6 +57,11 @@ export function createApp({ config, database: suppliedDatabase, logger } = {}) {
   app.register(swagger, {
     openapi: {
       info: { title: 'InsightUX API', version: '1.0.0' },
+      components: {
+        securitySchemes: {
+          participantToken: { type: 'http', scheme: 'bearer' }
+        }
+      },
       tags: [
         { name: 'system', description: '服务状态' },
         { name: 'auth', description: '管理员认证' },
@@ -86,6 +94,9 @@ export function createApp({ config, database: suppliedDatabase, logger } = {}) {
       }
     }, async () => ({ data: { status: 'ok', storage: 'better-sqlite3' } }))
     api.register(authRoutes, { prefix: '/api/v1/auth' })
+    api.register(participantRoutes, { prefix: '/api/v1' })
+    api.register(taskRoutes, { prefix: '/api/v1' })
+    api.register(sessionRoutes, { prefix: '/api/v1' })
     done()
   })
   if (!config.isProduction) {
