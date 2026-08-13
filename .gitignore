@@ -40,3 +40,5 @@ Thumbs.db
 test-*.html
 test-*.mjs
 test-*.js
+test-results/
+playwright-report/

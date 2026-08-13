@@ -14,7 +14,8 @@
     "build:sdk": "vite build --config vite.sdk.config.js",
     "preview": "vite preview",
     "start": "node server/index.js",
-    "test": "node --test",
+    "test": "node --test test/*.test.js",
+    "test:e2e": "playwright test",
     "lint": "eslint ."
   },
   "dependencies": {
@@ -29,6 +30,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.62.1",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
     "eslint": "^10.8.1",

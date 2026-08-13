@@ -195,7 +195,7 @@ export function createSiteStorage(rootDir) {
       response.writeHead(200, {
         'Content-Type': mimeTypes[extension] || 'application/octet-stream',
         'Cache-Control': extension === '.html' ? 'no-store' : 'public, max-age=31536000, immutable',
-        'Content-Security-Policy': "sandbox allow-scripts allow-forms allow-modals allow-popups; default-src 'self' data: blob: https: http:;",
+        'Content-Security-Policy': "sandbox allow-scripts allow-forms allow-modals allow-popups; default-src 'self' data: blob: https: http:; script-src 'self' 'unsafe-inline' data: blob: https: http:;",
         'X-Content-Type-Options': 'nosniff',
         'Referrer-Policy': 'no-referrer'
       })

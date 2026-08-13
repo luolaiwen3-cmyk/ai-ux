@@ -8,7 +8,8 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': 'http://127.0.0.1:8787',
-      '/test-content': 'http://127.0.0.1:8787'
+      '/test-content': 'http://127.0.0.1:8787',
+      '/insightux-recorder.js': 'http://127.0.0.1:8787'
     }
   }
 })

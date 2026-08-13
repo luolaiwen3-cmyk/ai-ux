@@ -251,7 +251,7 @@ export default function TaskPage() {
   return (
     <div className="relative z-10 min-h-screen bg-[#F5F5F7]">
       {/* 极小的记录提示 —— 不打扰用户 */}
-      <div className="fixed top-3 right-3 z-50 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/70 backdrop-blur-sm border border-slate-200 shadow-sm">
+      <div className="fixed top-3 right-3 z-50 pointer-events-none flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/70 backdrop-blur-sm border border-slate-200 shadow-sm">
         <span className="relative flex h-2 w-2">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
           <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
