@@ -1,0 +1,13 @@
+services:
+  insightux:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "8787:8787"
+    volumes:
+      - insightux-data:/app/data
+
+volumes:
+  insightux-data:
