@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import CheckoutPage from '../../components/participant/CheckoutPage.jsx'
 import { startRecording, stopRecording, saveToStorage } from '../../lib/rrwebRecorder.js'
 import { initMediaPipe, getCameraStream, startTracking, stopTracking, saveFrame } from '../../lib/mediaPipeTracker.js'
+import { loadFrames } from '../../lib/mediaPipeTracker.js'
+import { api, clearParticipantSession, getParticipantToken } from '../../lib/apiClient.js'
 
 /**
  * P3 测试任务页 —— 被试实际操作的核心页面
@@ -13,11 +15,15 @@ import { initMediaPipe, getCameraStream, startTracking, stopTracking, saveFrame 
 export default function TaskPage() {
   const { sessionId } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const [recording, setRecording] = useState(false)
   const [eventCount, setEventCount] = useState(0)
   const [stopReason, setStopReason] = useState(null)
-  const [faceEmotion, setFaceEmotion] = useState(null)
+  const [couponDecision, setCouponDecision] = useState('none')
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
   const recordingRef = useRef(false)
+  const pendingPayloadRef = useRef(null)
   const eventCountRef = useRef(0)
   const videoRef = useRef(null)
   const streamRef = useRef(null)
@@ -25,6 +31,24 @@ export default function TaskPage() {
 
   // 页面加载时开始录制 + 面部采集
   useEffect(() => {
+    let cancelled = false
+    if (!getParticipantToken(sessionId)) {
+      navigate('/', { replace: true })
+      return undefined
+    }
+
+    api.participant.getSession(sessionId)
+      .then(({ session }) => {
+        if (cancelled) return
+        if (!['created', 'recording'].includes(session.status)) {
+          navigate('/thanks', { replace: true })
+          return
+        }
+      })
+      .catch(() => {
+        if (!cancelled) navigate('/', { replace: true })
+      })
+
     // 1. 开始 rrweb 录制
     const onEvent = (event) => {
       if (event.type === '_stopped') {
@@ -45,15 +69,13 @@ export default function TaskPage() {
     }, 500)
 
     // 2. 开始 MediaPipe 面部采集（后台静默）
-    startFaceCapture()
+    if (!location.state?.behaviorOnly) startFaceCapture()
 
     return () => {
       clearInterval(timer)
       // 停止录制并保存
-      if (recordingRef.current) {
-        stopRecording()
-        saveToStorage(sessionId)
-      }
+      cancelled = true
+      if (recordingRef.current) stopRecording()
       // 停止面部采集
       stopTracking()
       if (streamRef.current) {
@@ -65,7 +87,7 @@ export default function TaskPage() {
         videoRef.current = null
       }
     }
-  }, [sessionId])
+  }, [sessionId, navigate, location.state?.behaviorOnly])
 
   // 启动面部采集
   const startFaceCapture = async () => {
@@ -97,10 +119,6 @@ export default function TaskPage() {
 
       // 开始追踪
       await startTracking(videoRef.current, (result) => {
-        if (result.emotion) {
-          setFaceEmotion(result.emotion)
-        }
-
         // 降采样存储：每 200ms 存一帧
         const now = Date.now()
         if (now - lastFaceCaptureRef.current > 200) {
@@ -113,19 +131,61 @@ export default function TaskPage() {
     }
   }
 
+  const submitPayload = useCallback(async (payload) => {
+    setSubmitting(true)
+    setSubmitError('')
+    try {
+      await api.participant.completeSession(sessionId, payload)
+      pendingPayloadRef.current = null
+      clearParticipantSession(sessionId)
+      navigate('/thanks', { replace: true })
+    } catch (error) {
+      setSubmitError(`${error.message}。录制数据已暂存在本机，请重试提交。`)
+      setSubmitting(false)
+    }
+  }, [sessionId, navigate])
+
   // 任务完成 —— 只有点击"提交订单"才停止录制 → 保存后进入感谢页
-  const handleTaskComplete = useCallback(() => {
-    if (!recordingRef.current) return // 防止重复触发
+  const handleTaskComplete = useCallback(async ({ selectedCount, couponApplied }) => {
+    if (!recordingRef.current || submitting) return // 防止重复触发
     const events = stopRecording()
     recordingRef.current = false
     setRecording(false)
     setEventCount(events.length)
 
-    // 存储录制数据
+    // 本地备份用于网络失败重试
     saveToStorage(sessionId)
-    // 进入感谢页
-    navigate('/thanks', { replace: true })
-  }, [sessionId, navigate])
+    stopTracking()
+    streamRef.current?.getTracks().forEach((track) => track.stop())
+
+    const firstTimestamp = events[0]?.timestamp || Date.now()
+    const lastTimestamp = events.at(-1)?.timestamp || firstTimestamp
+    const payload = {
+      events,
+      faceFrames: location.state?.behaviorOnly ? [] : loadFrames(sessionId),
+      couponDecision: couponDecision === 'none' && couponApplied ? 'applied' : couponDecision,
+      duration: Math.max(0, lastTimestamp - firstTimestamp),
+      metrics: { selectedCount, couponApplied }
+    }
+    pendingPayloadRef.current = payload
+    await submitPayload(payload)
+  }, [sessionId, couponDecision, location.state?.behaviorOnly, submitting, submitPayload])
+
+  const handleExit = async () => {
+    if (!window.confirm('确认退出？尚未提交的数据将从服务器和本机删除。')) return
+    stopRecording()
+    recordingRef.current = false
+    stopTracking()
+    streamRef.current?.getTracks().forEach((track) => track.stop())
+    try {
+      await api.participant.abandonSession(sessionId)
+    } finally {
+      localStorage.removeItem(`rrweb-events-${sessionId}`)
+      localStorage.removeItem(`mediapipe-frames-${sessionId}`)
+      clearParticipantSession(sessionId)
+      navigate('/', { replace: true })
+    }
+  }
 
   // 优惠券决策仅记录，不停止录制（已移除 15s 自动停止定时器）
 
@@ -153,8 +213,16 @@ export default function TaskPage() {
         )}
       </div>
 
+      <button onClick={handleExit} className="fixed top-3 left-3 z-50 px-2.5 py-1 rounded-full bg-white/80 border border-slate-200 text-[10px] text-slate-500 hover:text-red-600" data-no-record>
+        退出并删除数据
+      </button>
+
       {/* 真实的结算页 */}
-      <CheckoutPage onDecision={() => {}} onSubmit={handleTaskComplete} />
+      <CheckoutPage onDecision={(use) => setCouponDecision(use ? 'applied' : 'declined')} onSubmit={handleTaskComplete} />
+
+      {submitting && <div className="fixed inset-0 z-[80] bg-slate-950/30 flex items-center justify-center" data-no-record><div className="bg-white rounded-xl px-6 py-4 text-sm text-slate-700 shadow-xl">正在安全保存测试数据…</div></div>}
+
+      {submitError && <div className="fixed bottom-4 right-4 z-[90] max-w-sm rounded-xl bg-red-600 text-white p-4 shadow-xl" data-no-record><p className="text-xs leading-relaxed">{submitError}</p><button onClick={() => pendingPayloadRef.current && submitPayload(pendingPayloadRef.current)} className="mt-3 px-3 py-1.5 rounded bg-white text-red-700 text-xs font-medium">重新提交</button></div>}
 
       {/* 截断提示 */}
       {stopReason && stopReason !== 'manual' && (

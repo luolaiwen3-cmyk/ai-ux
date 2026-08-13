@@ -26,7 +26,7 @@ export default function CheckoutPage({ onDecision, onSubmit }) {
   }
 
   const handleSubmit = () => {
-    if (onSubmit) onSubmit()
+    if (onSubmit) onSubmit({ selectedCount: selectedItems.length, couponApplied })
   }
 
   const toggleItem = (idx) => {
