@@ -110,8 +110,11 @@ export default function TaskPage() {
 
     return () => {
       clearInterval(timer)
-      // 停止录制并保存
-      if (recordingRef.current) stopRecording()
+      // 非正常离开时保留本机缓冲，便于重新进入后人工恢复或排障。
+      if (recordingRef.current) {
+        stopRecording()
+        saveToStorage(sessionId)
+      }
       // 停止面部采集
       stopTracking()
       if (streamRef.current) {
