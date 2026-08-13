@@ -42,5 +42,10 @@ export const tasksApi = {
 export const sessionsApi = {
   create: (taskToken) => apiRequest(`/public/tasks/${taskToken}/sessions`, { method: 'POST' }),
   uploadBatch: (sessionId, uploadToken, payload) => apiRequest(`/public/sessions/${sessionId}/batches`, { method: 'POST', headers: { 'X-Upload-Token': uploadToken }, body: JSON.stringify(payload) }),
-  complete: (sessionId, uploadToken, payload) => apiRequest(`/public/sessions/${sessionId}/complete`, { method: 'POST', headers: { 'X-Upload-Token': uploadToken }, body: JSON.stringify(payload) })
+  complete: (sessionId, uploadToken, payload) => apiRequest(`/public/sessions/${sessionId}/complete`, { method: 'POST', headers: { 'X-Upload-Token': uploadToken }, body: JSON.stringify(payload) }),
+  list: () => apiRequest('/sessions'),
+  detail: (id) => apiRequest(`/sessions/${id}`),
+  rrweb: (id) => apiRequest(`/sessions/${id}/rrweb`),
+  faceFrames: (id) => apiRequest(`/sessions/${id}/face-frames`),
+  remove: (id) => apiRequest(`/sessions/${id}`, { method: 'DELETE' })
 }

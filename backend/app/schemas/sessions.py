@@ -34,3 +34,20 @@ class SessionCompleteResponse(BaseModel):
     status: str
     event_count: int
     face_frame_count: int
+
+
+class AnalystSessionResponse(BaseModel):
+    id: str
+    task_id: str
+    task_name: str
+    participant_id: str
+    status: str
+    started_at: datetime
+    completed_at: datetime | None
+    duration_ms: int
+    stop_reason: str | None
+    event_count: int
+    face_frame_count: int
+    severity: str | None
+    issue_summary: str | None
+    has_report: bool

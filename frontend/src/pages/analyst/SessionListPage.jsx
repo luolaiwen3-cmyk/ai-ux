@@ -1,212 +1,56 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import AnalystLayout from '../../components/shared/AnalystLayout.jsx'
-import { getSessionIndex } from '../../lib/rrwebRecorder.js'
+import { sessionsApi } from '../../api/client.js'
 
-/**
- * A2 会话列表 —— 所有被试会话总览，支持筛选/排序
- * 优先从 localStorage 读取真实录制会话，降级到 mock 数据
- */
+const severityColors = {
+  P0: 'bg-red-50 text-red-700 border-red-200',
+  P1: 'bg-amber-50 text-amber-700 border-amber-200',
+  P2: 'bg-blue-50 text-blue-700 border-blue-200'
+}
+
 export default function SessionListPage() {
-  const [filter, setFilter] = useState('all') // all | p0 | p1 | completed | reviewing
-  const [realSessions, setRealSessions] = useState([])
+  const [filter, setFilter] = useState('all')
+  const [sessions, setSessions] = useState([])
+  const [state, setState] = useState('loading')
+  const [error, setError] = useState('')
 
-  // 从 localStorage 读取真实录制会话
-  useEffect(() => {
-    const index = getSessionIndex()
-    if (index.length > 0) {
-      const sessions = index.map(s => ({
-        id: s.id,
-        task: '电商结算页优惠券弹窗测试',
-        participant: 'P-Real',
-        duration: `${(s.duration / 1000).toFixed(1)}s`,
-        status: 'completed',
-        severity: 'P0',
-        issue: '待分析（rrweb 真实录制）',
-        createdAt: new Date(s.savedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-        hasReport: false,
-        eventCount: s.eventCount,
-        isReal: true
-      }))
-      setRealSessions(sessions)
+  const load = async () => {
+    setState('loading')
+    try {
+      setSessions(await sessionsApi.list())
+      setState('ready')
+    } catch (err) {
+      setError(err.message)
+      setState('error')
     }
-  }, [])
+  }
+  useEffect(() => { load() }, [])
 
-  const mockSessions = [
-    {
-      id: 'UX-0812-0037',
-      task: '电商结算页优惠券弹窗测试',
-      participant: 'P-042',
-      duration: '20.0s',
-      status: 'completed',
-      severity: 'P0',
-      issue: '优惠券弹窗双按钮文案歧义',
-      createdAt: '13:21',
-      hasReport: true
-    },
-    {
-      id: 'UX-0812-0036',
-      task: '电商结算页优惠券弹窗测试',
-      participant: 'P-041',
-      duration: '18.5s',
-      status: 'completed',
-      severity: 'P1',
-      issue: '结算按钮位置不易发现',
-      createdAt: '13:15',
-      hasReport: true
-    },
-    {
-      id: 'UX-0812-0035',
-      task: '电商结算页优惠券弹窗测试',
-      participant: 'P-040',
-      duration: '22.1s',
-      status: 'reviewing',
-      severity: 'P0',
-      issue: '待分析',
-      createdAt: '13:08',
-      hasReport: false
-    },
-    {
-      id: 'UX-0812-0034',
-      task: '注册流程简化测试',
-      participant: 'P-039',
-      duration: '45.3s',
-      status: 'completed',
-      severity: 'P2',
-      issue: '表单字段过多导致放弃',
-      createdAt: '12:55',
-      hasReport: true
-    },
-    {
-      id: 'UX-0812-0033',
-      task: '注册流程简化测试',
-      participant: 'P-038',
-      duration: '38.7s',
-      status: 'completed',
-      severity: 'P1',
-      issue: '验证码输入体验差',
-      createdAt: '12:48',
-      hasReport: true
-    },
-    {
-      id: 'UX-0811-0032',
-      task: '电商结算页优惠券弹窗测试',
-      participant: 'P-037',
-      duration: '16.2s',
-      status: 'completed',
-      severity: 'P0',
-      issue: '优惠券弹窗双按钮文案歧义',
-      createdAt: '18:32',
-      hasReport: true
-    }
-  ]
-
-  // 合并真实会话和 mock 会话，真实会话排在前面
-  const allSessions = [...realSessions, ...mockSessions]
-
-  const filteredSessions = allSessions.filter((s) => {
+  const filtered = useMemo(() => sessions.filter((session) => {
     if (filter === 'all') return true
-    if (filter === 'p0') return s.severity === 'P0'
-    if (filter === 'p1') return s.severity === 'P1'
-    if (filter === 'completed') return s.status === 'completed'
-    if (filter === 'reviewing') return s.status === 'reviewing'
-    return true
-  })
+    if (filter === 'p0' || filter === 'p1') return session.severity?.toLowerCase() === filter
+    return session.status === filter
+  }), [sessions, filter])
 
-  const severityColors = {
-    P0: 'bg-danger/15 text-danger border-danger/30',
-    P1: 'bg-warn/15 text-warn border-warn/30',
-    P2: 'bg-cyan-soft/15 text-cyan-soft border-cyan-soft/30'
+  const remove = async (event, session) => {
+    event.preventDefault()
+    if (!window.confirm(`确定删除会话 ${session.id} 及其全部录制数据吗？此操作不可撤销。`)) return
+    try {
+      await sessionsApi.remove(session.id)
+      setSessions((current) => current.filter((item) => item.id !== session.id))
+    } catch (err) { setError(err.message) }
   }
 
-  const statusLabels = {
-    completed: { label: '已完成', color: 'text-emerald-400' },
-    reviewing: { label: '分析中', color: 'text-warn' }
-  }
-
-  return (
-    <AnalystLayout>
-      <div className="p-6">
-        {/* 页头 */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-lg font-semibold text-slate-100">会话列表</h1>
-            <p className="text-xs text-slate-500 mt-0.5">共 {allSessions.length} 个会话 · {allSessions.filter((s) => s.severity === 'P0').length} 个 P0 问题 · <span className="text-emerald-400">{realSessions.length} 个真实录制</span></p>
-          </div>
-        </div>
-
-        {/* 筛选 */}
-        <div className="flex items-center gap-2 mb-4">
-          {[
-            { key: 'all', label: '全部' },
-            { key: 'p0', label: 'P0 紧急' },
-            { key: 'p1', label: 'P1 重要' },
-            { key: 'reviewing', label: '分析中' },
-            { key: 'completed', label: '已完成' }
-          ].map((f) => (
-            <button
-              key={f.key}
-              onClick={() => setFilter(f.key)}
-              className={`px-3 py-1.5 rounded-lg text-[11px] font-mono transition-colors ${
-                filter === f.key
-                  ? 'bg-cyan-glow/15 text-cyan-glow border border-cyan-glow/25'
-                  : 'text-slate-500 hover:text-slate-300 border border-transparent'
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-
-        {/* 列表 */}
-        <div className="space-y-2">
-          {filteredSessions.map((s) => (
-            <Link
-              key={s.id}
-              to={`/sessions/${s.id}`}
-              className="block glass rounded-xl p-4 hover:border-cyan-glow/25 transition-colors group"
-            >
-              <div className="flex items-center gap-4">
-                {/* 严重程度 */}
-                <div className={`px-2 py-1 rounded text-[10px] font-mono font-semibold border shrink-0 ${severityColors[s.severity]}`}>
-                  {s.severity}
-                </div>
-
-                {/* 信息 */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[12px] font-medium text-slate-100 group-hover:text-cyan-glow transition-colors">
-                      {s.id}
-                    </span>
-                    <span className="text-[10px] text-slate-500">·</span>
-                    <span className="text-[11px] text-slate-400">{s.participant}</span>
-                    <span
-                      className={`text-[10px] font-mono ${statusLabels[s.status].color}`}
-                    >
-                      ● {statusLabels[s.status].label}
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-0.5 truncate">
-                    {s.issue}
-                  </div>
-                </div>
-
-                {/* 元信息 */}
-                <div className="flex items-center gap-4 shrink-0 text-[10px] font-mono text-slate-500">
-                  <span>{s.duration}</span>
-                  <span>{s.createdAt}</span>
-                  {s.hasReport && (
-                    <span className="text-emerald-400">报告 ✓</span>
-                  )}
-                </div>
-
-                {/* 箭头 */}
-                <span className="text-slate-600 group-hover:text-cyan-glow transition-colors">→</span>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </div>
-    </AnalystLayout>
-  )
+  return <AnalystLayout><div className="p-6">
+    <div className="mb-6"><h1 className="text-lg font-semibold text-slate-100">会话列表</h1><p className="text-xs text-slate-500 mt-0.5">共 {sessions.length} 个真实会话 · 数据来自本机 SQLite</p></div>
+    {error && <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">{error}</div>}
+    <div className="flex items-center gap-2 mb-4">{[
+      ['all', '全部'], ['p0', 'P0 紧急'], ['p1', 'P1 重要'], ['recording', '录制中'], ['completed', '已完成']
+    ].map(([key, label]) => <button key={key} onClick={() => setFilter(key)} className={`px-3 py-1.5 rounded-lg text-[11px] font-mono border ${filter === key ? 'bg-slate-900 text-white border-slate-900' : 'text-slate-600 border-transparent'}`}>{label}</button>)}</div>
+    {state === 'loading' && <div className="py-12 text-center text-sm text-slate-500">正在加载会话…</div>}
+    {state === 'error' && <button onClick={load} className="text-sm underline">重新加载</button>}
+    {state === 'ready' && filtered.length === 0 && <div className="glass rounded-xl p-12 text-center"><div className="text-sm text-slate-700">暂无符合条件的真实会话</div><div className="text-xs text-slate-500 mt-1">从任务管理复制测试链接并完成一次测试后，会话会显示在这里。</div></div>}
+    <div className="space-y-2">{filtered.map((session) => <Link key={session.id} to={`/sessions/${session.id}`} className="block glass rounded-xl p-4 hover:border-slate-400 transition-colors group"><div className="flex items-center gap-4"><div className={`px-2 py-1 rounded text-[10px] font-mono font-semibold border ${severityColors[session.severity] || 'bg-slate-50 text-slate-600 border-slate-200'}`}>{session.severity || '待分析'}</div><div className="flex-1 min-w-0"><div className="flex items-center gap-2"><span className="text-xs font-medium text-slate-900">{session.id}</span><span className="text-[11px] text-slate-500">{session.participant_id}</span><span className={`text-[10px] ${session.status === 'completed' ? 'text-emerald-600' : 'text-amber-600'}`}>● {session.status === 'completed' ? '已完成' : '录制中'}</span></div><div className="text-[11px] text-slate-500 mt-0.5 truncate">{session.issue_summary || `${session.task_name} · 待分析`}</div></div><div className="flex items-center gap-4 text-[10px] font-mono text-slate-500"><span>{(session.duration_ms / 1000).toFixed(1)}s</span><span>{session.event_count} events</span>{session.has_report && <span className="text-emerald-600">报告 ✓</span>}<button onClick={(event) => remove(event, session)} className="text-red-600 hover:underline">删除</button><span>→</span></div></div></Link>)}</div>
+  </div></AnalystLayout>
 }

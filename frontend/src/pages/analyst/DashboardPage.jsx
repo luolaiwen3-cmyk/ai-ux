@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import AnalystLayout from '../../components/shared/AnalystLayout.jsx'
+import { sessionsApi } from '../../api/client.js'
 import {
   ResponsiveContainer,
   AreaChart,
@@ -20,6 +21,11 @@ import {
  */
 export default function DashboardPage() {
   const [view, setView] = useState('normal') // normal | admin
+  const [sessions, setSessions] = useState([])
+
+  useEffect(() => {
+    sessionsApi.list().then(setSessions).catch(() => setSessions([]))
+  }, [])
 
   // 模拟趋势数据
   const trendData = [
@@ -40,12 +46,15 @@ export default function DashboardPage() {
     { type: '信息架构', count: 2 }
   ]
 
-  const recentSessions = [
-    { id: 'UX-0812-0037', participant: 'P-042', severity: 'P0', time: '13:21' },
-    { id: 'UX-0812-0036', participant: 'P-041', severity: 'P1', time: '13:15' },
-    { id: 'UX-0812-0035', participant: 'P-040', severity: 'P0', time: '13:08' },
-    { id: 'UX-0812-0034', participant: 'P-039', severity: 'P2', time: '12:55' }
-  ]
+  const recentSessions = sessions.slice(0, 4).map((session) => ({
+    id: session.id,
+    participant: session.participant_id,
+    severity: session.severity || '—',
+    time: new Date(session.started_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  }))
+  const today = new Date().toDateString()
+  const todaySessions = sessions.filter((session) => new Date(session.started_at).toDateString() === today)
+  const issueCount = sessions.filter((session) => session.issue_summary).length
 
   return (
     <AnalystLayout>
@@ -54,7 +63,7 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-lg font-semibold text-slate-100">仪表盘</h1>
-            <p className="text-xs text-slate-500 mt-0.5">欢迎回来，今日已发现 11 个 UX 问题</p>
+            <p className="text-xs text-slate-500 mt-0.5">欢迎回来，当前共有 {sessions.length} 个真实会话</p>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -82,10 +91,10 @@ export default function DashboardPage() {
 
         {/* 核心指标 */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-          <StatCard label="今日会话" value="18" delta="↑ 80%" color="text-cyan-glow" />
-          <StatCard label="发现问题" value="11" delta="↑ 37%" color="text-danger" />
-          <StatCard label="P0 紧急" value="4" delta="+2" color="text-danger" />
-          <StatCard label="已生成报告" value="9" delta="↑ 50%" color="text-emerald-400" />
+          <StatCard label="今日会话" value={String(todaySessions.length)} delta="本机数据" color="text-cyan-glow" />
+          <StatCard label="发现问题" value={String(issueCount)} delta="已诊断" color="text-danger" />
+          <StatCard label="P0 紧急" value={String(sessions.filter((session) => session.severity === 'P0').length)} delta="需优先处理" color="text-danger" />
+          <StatCard label="已生成报告" value={String(sessions.filter((session) => session.has_report).length)} delta="持久化报告" color="text-emerald-400" />
         </div>
 
         {/* 普通视图 */}
@@ -102,6 +111,7 @@ export default function DashboardPage() {
                 </Link>
               </div>
               <div className="space-y-2">
+                {recentSessions.length === 0 && <div className="px-3 py-8 text-center text-xs text-slate-500">暂无真实会话</div>}
                 {recentSessions.map((s) => (
                   <Link
                     key={s.id}

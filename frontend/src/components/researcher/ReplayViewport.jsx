@@ -1,28 +1,15 @@
-import React, { useMemo, useRef, useEffect, useState } from 'react'
+import React, { useMemo, useRef, useEffect } from 'react'
 import FaceMesh from './FaceMesh.jsx'
 import RrwebPlayer from './RrwebPlayer.jsx'
-import { loadFromStorage } from '../../lib/rrwebRecorder.js'
-import { loadFrames } from '../../lib/mediaPipeTracker.js'
 
 /**
  * 回放视口 —— 还原被试操作过程
  * 优先使用 rrweb 真实录制数据回放，降级到 mock 轨迹
  * + MediaPipe 面部视频帧回放
  */
-export default function ReplayViewport({ currentTime, mouseTrail, clickEvents, duration, sessionId }) {
+export default function ReplayViewport({ currentTime, mouseTrail, clickEvents, duration, sessionId, events = [], faceFrames = [] }) {
   const playerRef = useRef(null)
-  const [hasRealData, setHasRealData] = useState(false)
-  const [realEvents, setRealEvents] = useState([])
-  const [playerDuration, setPlayerDuration] = useState(duration * 1000)
-  const [faceFrames, setFaceFrames] = useState([])
-
-  // 加载面部帧数据
-  useEffect(() => {
-    const frames = loadFrames(sessionId)
-    if (frames && frames.length > 0) {
-      setFaceFrames(frames)
-    }
-  }, [sessionId])
+  const hasRealData = events.some((event) => event?.type === 0)
 
   // 获取当前时间点的面部帧
   const currentFaceFrame = useMemo(() => {
@@ -42,29 +29,6 @@ export default function ReplayViewport({ currentTime, mouseTrail, clickEvents, d
     return closest
   }, [faceFrames, currentTime])
 
-  // 检查是否有真实录制数据（从 localStorage 读取）
-  useEffect(() => {
-    const events = loadFromStorage(sessionId)
-    if (events && events.length > 0) {
-      // 验证数据完整性：首事件必须是 FullSnapshot (type=0)
-      const firstEvent = events[0]
-      if (firstEvent && firstEvent.type === 0) {
-        setRealEvents(events)
-        setHasRealData(true)
-        console.log('[ReplayViewport] 真实数据加载成功:', events.length, '个事件')
-      } else {
-        console.warn('[ReplayViewport] 数据格式异常，首事件类型:', firstEvent?.type)
-        // 尝试查找 FullSnapshot
-        const snapshotIdx = events.findIndex(e => e.type === 0)
-        if (snapshotIdx >= 0) {
-          console.log('[ReplayViewport] 找到 FullSnapshot 在位置:', snapshotIdx)
-          setRealEvents(events)
-          setHasRealData(true)
-        }
-      }
-    }
-  }, [sessionId])
-
   // 同步播放位置
   useEffect(() => {
     if (hasRealData && playerRef.current) {
@@ -76,7 +40,7 @@ export default function ReplayViewport({ currentTime, mouseTrail, clickEvents, d
   const showPopup = currentTime >= 3.5 && currentTime < 15
 
   // 如果有真实数据，使用 rrweb 回放
-  if (hasRealData && realEvents.length > 0) {
+  if (hasRealData && events.length > 0) {
     return (
       <div className="glass rounded-xl p-4 flex-1 min-h-[320px] flex flex-col relative overflow-hidden">
         {/* 标题栏 */}
@@ -103,7 +67,7 @@ export default function ReplayViewport({ currentTime, mouseTrail, clickEvents, d
 
         {/* rrweb 回放区 */}
         <div className="flex-1 min-h-0 rounded-lg border border-cyan-glow/10 overflow-hidden bg-white">
-          <RrwebPlayer ref={playerRef} events={realEvents} />
+          <RrwebPlayer ref={playerRef} events={events} />
         </div>
 
         {/* 摄像头悬浮框（右上角） */}

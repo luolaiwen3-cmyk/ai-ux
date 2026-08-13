@@ -7,8 +7,7 @@ import Timeline from '../../components/researcher/Timeline.jsx'
 import BehaviorCards from '../../components/researcher/BehaviorCards.jsx'
 import DiagnosisPanel from '../../components/researcher/DiagnosisPanel.jsx'
 import { mouseTrail, clickEvents, timelineEvents, stressData, behaviorStats, sessionMeta } from '../../data/sessionData.js'
-import { loadFromStorage, hasStoredSession, getSessionIndex } from '../../lib/rrwebRecorder.js'
-import { loadFrames, hasFaceData } from '../../lib/mediaPipeTracker.js'
+import { sessionsApi } from '../../api/client.js'
 
 /**
  * A3 单会话深度分析 —— 核心页面
@@ -20,27 +19,28 @@ export default function SessionDetailPage() {
   const [playing, setPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [playbackSpeed, setPlaybackSpeed] = useState(1)
-  const [useRealData, setUseRealData] = useState(false)
+  const [session, setSession] = useState(null)
+  const [rrwebEvents, setRrwebEvents] = useState([])
   const [faceFrames, setFaceFrames] = useState([])
-  const [hasFace, setHasFace] = useState(false)
-  const duration = 20
+  const [loadState, setLoadState] = useState('loading')
+  const [loadError, setLoadError] = useState('')
+  const duration = Math.max(1, (session?.duration_ms || 20000) / 1000)
   const rafRef = useRef(null)
   const lastTimeRef = useRef(null)
 
-  // 检查是否有真实录制数据
   useEffect(() => {
-    // 检查当前会话或任意会话
-    const hasData = hasStoredSession(id) || hasStoredSession()
-    setUseRealData(hasData)
-    console.log('[SessionDetail] 会话ID:', id, '有数据:', hasData)
-
-    // 加载面部帧数据
-    const frames = loadFrames(id)
-    if (frames && frames.length > 0) {
-      setFaceFrames(frames)
-      setHasFace(true)
-      console.log('[SessionDetail] 面部帧数:', frames.length)
-    }
+    setLoadState('loading')
+    Promise.all([sessionsApi.detail(id), sessionsApi.rrweb(id), sessionsApi.faceFrames(id)])
+      .then(([detail, events, frames]) => {
+        setSession(detail)
+        setRrwebEvents(events)
+        setFaceFrames(frames)
+        setLoadState('ready')
+      })
+      .catch((error) => {
+        setLoadError(error.message)
+        setLoadState('error')
+      })
   }, [id])
 
   const animate = useCallback(
@@ -85,6 +85,9 @@ export default function SessionDetailPage() {
     if (playing) setPlaying(false)
   }
 
+  if (loadState === 'loading') return <AnalystLayout><div className="p-10 text-sm text-slate-500">正在加载会话数据…</div></AnalystLayout>
+  if (loadState === 'error') return <AnalystLayout><div className="p-10"><div className="text-sm text-red-600">{loadError}</div><Link to="/sessions" className="text-sm underline mt-3 inline-block">返回会话列表</Link></div></AnalystLayout>
+
   return (
     <AnalystLayout>
       <div className="p-4 flex flex-col gap-4 h-[calc(100vh-0px)] min-h-0">
@@ -96,21 +99,21 @@ export default function SessionDetailPage() {
             </Link>
             <div>
               <h1 className="text-[14px] font-semibold text-slate-100">
-                会话 {id || sessionMeta.id}
+                会话 {id}
               </h1>
               <p className="text-[10px] text-slate-500 font-mono">
-                {sessionMeta.participant} · {sessionMeta.task}
+                {session.participant_id} · {session.task_name}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {useRealData && (
+            {rrwebEvents.length > 0 && (
               <span className="px-2 py-0.5 rounded text-[9px] font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
                 rrweb 真实录制
               </span>
             )}
             <Link
-              to={`/report/${id || sessionMeta.id}`}
+              to={`/report/${id}`}
               className="px-3 py-1.5 rounded-lg bg-cyan-glow/15 border border-cyan-glow/25 text-[11px] font-mono text-cyan-glow hover:bg-cyan-glow/25 transition-colors"
             >
               📄 查看报告
@@ -127,7 +130,9 @@ export default function SessionDetailPage() {
               mouseTrail={mouseTrail}
               clickEvents={clickEvents}
               duration={duration}
-              sessionId={id || sessionMeta.id}
+              sessionId={id}
+              events={rrwebEvents}
+              faceFrames={faceFrames}
             />
             <Timeline
               currentTime={currentTime}
@@ -143,8 +148,8 @@ export default function SessionDetailPage() {
 
           {/* 右侧 40%：数据 + 报告 */}
           <div className="lg:col-span-5 flex flex-col gap-4 min-h-0 overflow-y-auto">
-            <BehaviorCards stats={behaviorStats} meta={sessionMeta} />
-            {hasFace && <FaceDataCard frames={faceFrames} currentTime={currentTime} />}
+            <BehaviorCards stats={{ ...behaviorStats, totalDuration: `${duration.toFixed(1)}s`, totalClicks: session.event_count }} meta={{ ...sessionMeta, participant: session.participant_id, task: session.task_name }} />
+            {faceFrames.length > 0 && <FaceDataCard frames={faceFrames} currentTime={currentTime} />}
             <StressChart data={stressData} currentTime={currentTime} duration={duration} />
             <DiagnosisPanel />
           </div>
