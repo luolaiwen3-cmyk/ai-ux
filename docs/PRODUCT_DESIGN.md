@@ -39,7 +39,10 @@ InsightUX 是面向 UX 研究员的单租户私有化测试平台。研究员创
 | `token` | 被试访问用随机 Token |
 | `name` | 任务名称 |
 | `description` | 被试可见说明 |
-| `scenario` | 当前可执行场景，比赛版为 `checkout-coupon` |
+| `scenario` | `checkout-coupon` 或通用网页 `generic-web` |
+| `targetType` | `builtin` / `upload` / `url` |
+| `targetStatus` | 网页是否已通过上传或 SDK 握手验证 |
+| `targetUrl` / `contentRevision` | 外部地址或已托管静态网页版本 |
 | `steps` | 有序任务步骤 |
 | `status` | `draft` / `active` / `paused` |
 | `createdAt` / `updatedAt` | 审计时间 |
@@ -51,6 +54,7 @@ InsightUX 是面向 UX 研究员的单租户私有化测试平台。研究员创
 | `id` | 稳定 UUID |
 | `taskId` | 所属任务 |
 | `participantCode` | 展示用匿名编号 |
+| `mode` | 正式 `participant` 或管理员 `trial` |
 | `status` | `created` / `recording` / `completed` / `abandoned` |
 | `consentAt` | 同意时间 |
 | `startedAt` / `completedAt` | 测试时间 |
@@ -108,12 +112,15 @@ InsightUX 是面向 UX 研究员的单租户私有化测试平台。研究员创
 - 记录实际优惠券选择、点击与完成时间。
 - 完成后上传行为和面部数据，状态变为 `completed`。
 - 离开页面时尽力保存缓冲；主动退出时删除未提交数据。
+- 自定义网页在 iframe 内通过 InsightUX Recorder SDK 录制，由父页面统一提交和显示“完成测试”。
 
 ### A1 任务管理
 
 - 创建、编辑、发布、暂停均持久化。
 - 只为 `active` 任务提供可访问链接。
-- 暂不支持的场景不能作为可发布选项展示。
+- 支持内置模板、静态网站 ZIP 和已接入录制 SDK 的 URL。
+- ZIP 缺少入口或包含不安全内容、URL 未通过 SDK 握手时不得发布。
+- 已验证任务支持管理员试跑；试跑数据不得进入正式统计和诊断。
 
 ### A2 会话列表
 
@@ -148,10 +155,12 @@ InsightUX 是面向 UX 研究员的单租户私有化测试平台。研究员创
 - README 包含开发、测试、生产启动、数据目录、AI 配置和隐私说明。
 - 每个功能独立提交，提交前必须运行与该功能相关的验证。
 
-## 7. 明确不在比赛版范围
+## 7. 明确不在当前范围
 
 - SaaS 多租户与计费。
 - 团队成员分级权限和外部 OAuth。
-- 注册流程、SaaS 仪表盘等第二测试场景。
+- 代理抓取或克隆任意第三方网站。
+- 为无法安装 SDK 的第三方网站开发浏览器扩展。
+- 运行上传网站的服务端程序、数据库或构建步骤。
 - 原始连续摄像头视频保存。
 - 宣称医疗级、心理学级情绪识别准确率。
