@@ -92,6 +92,18 @@ export function createStore(databasePath) {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     )`,
+    `CREATE TABLE IF NOT EXISTS diagnoses (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL UNIQUE REFERENCES sessions(id) ON DELETE CASCADE,
+      status TEXT NOT NULL CHECK (status IN ('completed', 'failed')),
+      provider TEXT NOT NULL,
+      model TEXT NOT NULL,
+      result_json TEXT,
+      fallback_reason TEXT,
+      share_token TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )`,
     'CREATE INDEX IF NOT EXISTS sessions_task_id_idx ON sessions(task_id)',
     'CREATE INDEX IF NOT EXISTS sessions_created_at_idx ON sessions(created_at DESC)'
   ]
@@ -112,9 +124,11 @@ export function createStore(databasePath) {
 
   const sessionSelect = `
     SELECT sessions.*, tasks.name AS task_name,
-      NULL AS diagnosis_status, NULL AS severity
+      diagnoses.status AS diagnosis_status,
+      json_extract(diagnoses.result_json, '$.severity') AS severity
     FROM sessions
     JOIN tasks ON tasks.id = sessions.task_id
+    LEFT JOIN diagnoses ON diagnoses.session_id = sessions.id
   `
 
   const store = {
@@ -298,12 +312,51 @@ export function createStore(databasePath) {
     getSession(id) {
       const row = database.prepare(`${sessionSelect} WHERE sessions.id = ?`).get(id)
       if (!row) return null
+      const diagnosis = store.getDiagnosis(id)
       return {
         ...mapSessionSummary(row),
         events: parseJson(row.rrweb_events_json, []),
         faceFrames: parseJson(row.face_frames_json, []),
-        metrics: parseJson(row.metrics_json, {})
+        metrics: parseJson(row.metrics_json, {}),
+        diagnosis
       }
+    },
+
+    saveDiagnosis(sessionId, diagnosis) {
+      const timestamp = nowIso()
+      const existing = database.prepare('SELECT * FROM diagnoses WHERE session_id = ?').get(sessionId)
+      const shareToken = existing?.share_token || createOpaqueToken(18)
+      if (existing) {
+        database.prepare(`
+          UPDATE diagnoses SET status = 'completed', provider = ?, model = ?, result_json = ?,
+            fallback_reason = ?, updated_at = ? WHERE session_id = ?
+        `).run(diagnosis.provider, diagnosis.model, JSON.stringify(diagnosis.result), diagnosis.fallbackReason, timestamp, sessionId)
+      } else {
+        database.prepare(`
+          INSERT INTO diagnoses (id, session_id, status, provider, model, result_json, fallback_reason, share_token, created_at, updated_at)
+          VALUES (?, ?, 'completed', ?, ?, ?, ?, ?, ?, ?)
+        `).run(randomUUID(), sessionId, diagnosis.provider, diagnosis.model, JSON.stringify(diagnosis.result), diagnosis.fallbackReason, shareToken, timestamp, timestamp)
+      }
+      return store.getDiagnosis(sessionId)
+    },
+
+    getDiagnosis(sessionId) {
+      const row = database.prepare('SELECT * FROM diagnoses WHERE session_id = ?').get(sessionId)
+      return row && {
+        status: row.status,
+        provider: row.provider,
+        model: row.model,
+        result: parseJson(row.result_json, null),
+        fallbackReason: row.fallback_reason,
+        shareToken: row.share_token,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      }
+    },
+
+    getSharedReport(token) {
+      const row = database.prepare('SELECT session_id FROM diagnoses WHERE share_token = ? AND status = \'completed\'').get(token)
+      return row ? store.getSession(row.session_id) : null
     },
 
     getDashboardStats() {

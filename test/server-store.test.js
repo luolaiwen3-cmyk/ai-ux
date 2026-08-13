@@ -39,6 +39,18 @@ test('任务 Token 可以创建并完成唯一会话', () => {
     assert.equal(completed.metrics.totalDurationMs, 3200)
     assert.equal(completed.metrics.finalDecision, 'applied')
     assert.deepEqual(completed.metrics.taskResult, { totalClicks: 1 })
+
+    const diagnosis = store.saveDiagnosis(first.id, {
+      provider: 'local-rules',
+      model: 'insightux-rules-v1',
+      fallbackReason: null,
+      result: {
+        severity: 'P1', confidence: 0.82, summary: '存在摩擦', rootCause: '选择不清晰',
+        evidence: [], recommendations: ['强化主次'], expectedImpact: '降低决策时长', similarCases: []
+      }
+    })
+    assert.equal(diagnosis.provider, 'local-rules')
+    assert.equal(store.getSharedReport(diagnosis.shareToken).id, first.id)
   } finally {
     store.close()
   }

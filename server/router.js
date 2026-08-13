@@ -5,6 +5,7 @@ import {
   verifyPassword
 } from './auth.js'
 import { HttpError, readJson, requireText, sendJson } from './http.js'
+import { diagnoseSession } from './diagnosis.js'
 
 const TASK_STATUSES = new Set(['draft', 'active', 'paused'])
 const SESSION_STATUSES = new Set(['created', 'recording', 'completed', 'abandoned'])
@@ -93,6 +94,15 @@ export function createApiRouter({ store, config }) {
       if (body.consent !== true) throw new HttpError(400, '必须确认知情同意', 'CONSENT_REQUIRED')
       const session = store.createSession(task.id)
       sendJson(response, 201, { session })
+      return true
+    }
+
+    const publicReportMatch = pathname.match(/^\/api\/public\/reports\/([^/]+)$/)
+    if (request.method === 'GET' && publicReportMatch) {
+      const report = store.getSharedReport(decodeURIComponent(publicReportMatch[1]))
+      if (!report) throw new HttpError(404, '分享报告不存在或已失效', 'REPORT_NOT_FOUND')
+      const { events: _events, faceFrames: _faceFrames, ...safeReport } = report
+      sendJson(response, 200, { report: safeReport })
       return true
     }
 
@@ -193,6 +203,16 @@ export function createApiRouter({ store, config }) {
       const session = store.getSession(decodeURIComponent(sessionMatch[1]))
       if (!session) throw new HttpError(404, '会话不存在', 'SESSION_NOT_FOUND')
       sendJson(response, 200, { session })
+      return true
+    }
+
+    const diagnoseMatch = pathname.match(/^\/api\/sessions\/([^/]+)\/diagnose$/)
+    if (request.method === 'POST' && diagnoseMatch) {
+      const session = store.getSession(decodeURIComponent(diagnoseMatch[1]))
+      if (!session) throw new HttpError(404, '会话不存在', 'SESSION_NOT_FOUND')
+      if (session.status !== 'completed') throw new HttpError(409, '会话完成后才能诊断', 'SESSION_NOT_COMPLETED')
+      const diagnosis = await diagnoseSession(session, config)
+      sendJson(response, 200, { diagnosis: store.saveDiagnosis(session.id, diagnosis) })
       return true
     }
 

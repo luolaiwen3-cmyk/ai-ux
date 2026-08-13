@@ -9,6 +9,9 @@ export const config = {
   adminPassword: process.env.ADMIN_PASSWORD || 'insightux-demo',
   sessionSecret: process.env.ADMIN_SESSION_SECRET || 'insightux-development-secret-change-me',
   publicAppUrl: process.env.PUBLIC_APP_URL || 'http://localhost:8787',
+  dashscopeApiKey: process.env.DASHSCOPE_API_KEY || '',
+  qwenBaseUrl: process.env.QWEN_BASE_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+  qwenModel: process.env.QWEN_MODEL || 'qwen3-vl-plus',
   isProduction
 }
 
