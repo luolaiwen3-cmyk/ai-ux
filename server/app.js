@@ -33,7 +33,13 @@ const errorPayload = (request, code, message, details) => ({
   }
 })
 
-export function createApp({ config, database: suppliedDatabase, logger, apiOnly = false } = {}) {
+export function createApp({
+  config,
+  database: suppliedDatabase,
+  logger,
+  apiOnly = false,
+  assetsDir
+} = {}) {
   if (!config) throw new Error('createApp 必须提供 config')
 
   const app = Fastify({
@@ -107,7 +113,10 @@ export function createApp({ config, database: suppliedDatabase, logger, apiOnly 
   })
   app.register(siteRoutes)
   const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-  app.register(registerApplicationAssets, { distDir: path.join(rootDir, 'dist'), apiOnly })
+  app.register(registerApplicationAssets, {
+    distDir: assetsDir || path.join(rootDir, 'dist'),
+    apiOnly
+  })
   if (!config.isProduction) {
     app.register(swaggerUi, { routePrefix: '/docs' })
   }

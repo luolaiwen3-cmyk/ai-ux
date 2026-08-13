@@ -45,7 +45,7 @@ export async function registerApplicationAssets(app, { distDir, apiOnly = false 
     root: distDir,
     wildcard: false,
     setHeaders(response, filePath) {
-      response.setHeader('Cache-Control', filePath.endsWith('.html')
+      response.header('Cache-Control', filePath.endsWith('.html')
         ? 'no-cache'
         : 'public, max-age=31536000, immutable')
     }
