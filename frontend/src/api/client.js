@@ -54,3 +54,8 @@ export const reportsApi = {
   get: (sessionId) => apiRequest(`/sessions/${sessionId}/report`),
   generate: (sessionId) => apiRequest(`/sessions/${sessionId}/report`, { method: 'POST' })
 }
+
+export const adminApi = {
+  importLegacy: (payload) => apiRequest('/admin/legacy-import', { method: 'POST', body: JSON.stringify(payload) }),
+  backupUrl: '/api/admin/backup'
+}

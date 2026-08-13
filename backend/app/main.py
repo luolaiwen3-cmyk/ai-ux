@@ -10,6 +10,7 @@ from app.api.tasks import router as tasks_router
 from app.api.sessions import router as participant_sessions_router
 from app.api.analyst_sessions import router as analyst_sessions_router
 from app.api.reports import router as reports_router
+from app.api.admin import router as admin_router
 from app.core.config import get_settings
 
 
@@ -29,6 +30,7 @@ app.include_router(tasks_router, prefix="/api")
 app.include_router(participant_sessions_router, prefix="/api")
 app.include_router(analyst_sessions_router, prefix="/api")
 app.include_router(reports_router, prefix="/api")
+app.include_router(admin_router, prefix="/api")
 
 settings = get_settings()
 assets_dir = settings.frontend_dist / "assets"

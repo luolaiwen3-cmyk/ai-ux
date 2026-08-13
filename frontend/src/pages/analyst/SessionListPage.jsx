@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import AnalystLayout from '../../components/shared/AnalystLayout.jsx'
 import { sessionsApi } from '../../api/client.js'
+import LegacyImport from '../../components/analyst/LegacyImport.jsx'
 
 const severityColors = {
   P0: 'bg-red-50 text-red-700 border-red-200',
@@ -45,6 +46,7 @@ export default function SessionListPage() {
   return <AnalystLayout><div className="p-6">
     <div className="mb-6"><h1 className="text-lg font-semibold text-slate-100">会话列表</h1><p className="text-xs text-slate-500 mt-0.5">共 {sessions.length} 个真实会话 · 数据来自本机 SQLite</p></div>
     {error && <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">{error}</div>}
+    <LegacyImport onImported={load} />
     <div className="flex items-center gap-2 mb-4">{[
       ['all', '全部'], ['p0', 'P0 紧急'], ['p1', 'P1 重要'], ['recording', '录制中'], ['completed', '已完成']
     ].map(([key, label]) => <button key={key} onClick={() => setFilter(key)} className={`px-3 py-1.5 rounded-lg text-[11px] font-mono border ${filter === key ? 'bg-slate-900 text-white border-slate-900' : 'text-slate-600 border-transparent'}`}>{label}</button>)}</div>

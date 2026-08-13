@@ -1,6 +1,7 @@
 import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import ErrorBoundary from './ErrorBoundary.jsx'
+import { adminApi } from '../../api/client.js'
 
 /**
  * 分析人员端共享布局 —— 左侧导航 + 右侧内容区
@@ -56,6 +57,9 @@ export default function AnalystLayout({ children }) {
 
         {/* 底部用户信息 */}
         <div className="px-4 py-3 border-t border-slate-200">
+          <form method="post" action={adminApi.backupUrl} className="mb-2">
+            <button className="w-full text-left px-2 py-1.5 rounded text-[10px] text-slate-500 hover:bg-slate-50 hover:text-slate-900">↓ 下载完整备份</button>
+          </form>
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-full bg-slate-900 flex items-center justify-center text-[10px] text-white font-medium">
               A
