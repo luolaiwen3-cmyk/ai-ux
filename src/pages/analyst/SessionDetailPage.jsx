@@ -6,7 +6,6 @@ import StressChart from '../../components/researcher/StressChart.jsx'
 import Timeline from '../../components/researcher/Timeline.jsx'
 import BehaviorCards from '../../components/researcher/BehaviorCards.jsx'
 import DiagnosisPanel from '../../components/researcher/DiagnosisPanel.jsx'
-import { mouseTrail, clickEvents, timelineEvents } from '../../data/sessionData.js'
 import { api } from '../../lib/apiClient.js'
 
 /**
@@ -58,7 +57,7 @@ export default function SessionDetailPage() {
     }
   }, [duration])
 
-  // 本地时钟驱动（无真实数据或 mock 模式时使用）
+  // rrweb 播放器尚未接管时间时使用本地时钟。
   const animate = useCallback(
     (timestamp) => {
       if (playerDrivingRef.current) return // player 驱动时跳过本地时钟
@@ -155,8 +154,6 @@ export default function SessionDetailPage() {
           <div className="lg:col-span-7 flex flex-col gap-4 min-h-0">
             <ReplayViewport
               currentTime={currentTime}
-              mouseTrail={mouseTrail}
-              clickEvents={clickEvents}
               duration={duration}
               sessionId={id}
               playing={playing}
@@ -168,7 +165,7 @@ export default function SessionDetailPage() {
             <Timeline
               currentTime={currentTime}
               duration={duration}
-              events={timelineEvents}
+              events={[]}
               stressData={realStressData}
               onScrub={handleScrub}
               playing={playing}
