@@ -22,6 +22,9 @@ dist-ssr/
 # Nested independent repo; keep local, do not track in this project
 /ai-ux-latex/
 
+# Local SDK demo connection settings
+examples/sdk-demo/.sdk-config.json
+
 # Environment files
 .env
 .env.local
