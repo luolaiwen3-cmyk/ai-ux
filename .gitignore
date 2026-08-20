@@ -19,6 +19,9 @@ dist-ssr/
 *.local
 /data/
 
+# Nested independent repo; keep local, do not track in this project
+/ai-ux-latex/
+
 # Environment files
 .env
 .env.local
