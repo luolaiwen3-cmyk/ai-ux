@@ -44,13 +44,14 @@ export default function SessionListPage() {
 
   return (
     <AnalystLayout>
-      <div className="p-6">
-        <div className="flex items-center justify-between mb-6">
+      <div className="analyst-page">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between mb-7">
           <div>
-            <h1 className="text-lg font-semibold text-slate-100">会话列表</h1>
-            <p className="text-xs text-slate-500 mt-0.5">{scope === 'trial' ? '试跑验收' : '正式测试'} · 共 {sessions.length} 个会话 · {sessions.filter((item) => item.status === 'completed').length} 个已完成</p>
+            <div className="analyst-eyebrow mb-1.5">Sessions</div>
+            <h1 className="analyst-title">会话列表</h1>
+            <p className="analyst-subtitle">{scope === 'trial' ? '试跑验收' : '正式测试'} · 共 {sessions.length} 个会话 · {sessions.filter((item) => item.status === 'completed').length} 个已完成</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 self-start sm:self-auto">
             <select aria-label="会话排序" value={sort} onChange={(event) => setSort(event.target.value)} className="px-3 py-2 rounded-lg border border-slate-200 text-xs">
               <option value="desc">最新优先</option>
               <option value="asc">最早优先</option>
@@ -61,7 +62,7 @@ export default function SessionListPage() {
 
         {error && <div role="alert" className="mb-4 px-4 py-3 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700">{error}</div>}
 
-        <div className="flex items-center gap-2 mb-4 overflow-x-auto">
+        <div className="flex items-center gap-1 mb-4 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
           <button onClick={() => { setScope('participant'); setFilter('all') }} className={`px-3 py-1.5 rounded-lg text-[11px] ${scope === 'participant' ? 'bg-cyan-glow/15 text-cyan-glow border border-cyan-glow/25' : 'text-slate-500 border border-transparent'}`}>正式会话</button>
           <button onClick={() => { setScope('trial'); setFilter('all') }} className={`px-3 py-1.5 rounded-lg text-[11px] ${scope === 'trial' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/25' : 'text-slate-500 border border-transparent'}`}>试跑会话</button>
           <div className="w-px h-5 bg-slate-700 mx-1" />
@@ -84,7 +85,7 @@ export default function SessionListPage() {
         ) : (
           <div className="space-y-2">
             {visibleSessions.map((session) => (
-              <Link key={session.id} to={`/sessions/${session.id}`} className="block glass rounded-xl p-4 hover:border-cyan-glow/25 transition-colors group">
+              <Link key={session.id} to={`/sessions/${session.id}`} className="block glass rounded-2xl p-4 hover:border-indigo-200 hover:-translate-y-px transition-all group">
                 <div className="flex items-center gap-4">
                   <div className={`px-2 py-1 rounded text-[10px] font-mono font-semibold border shrink-0 ${session.severity === 'P0' ? 'bg-danger/15 text-danger border-danger/30' : session.severity === 'P1' ? 'bg-warn/15 text-warn border-warn/30' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>{session.severity || '—'}</div>
                   <div className="flex-1 min-w-0">

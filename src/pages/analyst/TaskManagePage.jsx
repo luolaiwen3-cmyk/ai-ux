@@ -147,10 +147,10 @@ export default function TaskManagePage() {
 
   return (
     <AnalystLayout>
-      <div className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div><h1 className="text-lg font-semibold text-slate-100">任务管理</h1><p className="text-xs text-slate-500 mt-0.5">上传网页、验证录制并发布真实测试</p></div>
-          <button onClick={() => { setShowCreate(true); setCreateStep(1) }} className="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-glow/90 to-cyan-soft/90 text-ink-900 text-xs font-semibold">+ 新建任务</button>
+      <div className="analyst-page">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between mb-7">
+          <div><div className="analyst-eyebrow mb-1.5">Research tasks</div><h1 className="analyst-title">任务管理</h1><p className="analyst-subtitle">创建测试、接入目标网页并分享给参与者</p></div>
+          <button onClick={() => { setShowCreate(true); setCreateStep(1) }} className="self-start sm:self-auto px-4 py-2.5 rounded-xl bg-slate-950 hover:bg-indigo-600 text-white text-xs font-semibold shadow-sm transition-colors">+ 新建任务</button>
         </div>
 
         {error && <div role="alert" className="mb-4 px-4 py-3 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700">{error}</div>}
@@ -159,8 +159,8 @@ export default function TaskManagePage() {
         {loading ? <EmptyState title="正在加载任务…" /> : tasks.length === 0 ? <EmptyState title="暂无任务，创建第一个测试任务吧。" /> : (
           <div className="space-y-3">
             {tasks.map((task) => (
-              <div key={task.id} className="glass rounded-xl p-4 hover:border-cyan-glow/25 transition-colors">
-                <div className="flex items-start justify-between gap-4">
+              <div key={task.id} className="glass rounded-2xl p-4 sm:p-5 hover:border-indigo-200 transition-colors">
+                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-[10px] font-mono text-slate-500">{task.id.slice(0, 8)}</span>
@@ -171,7 +171,7 @@ export default function TaskManagePage() {
                     <div className="text-[11px] text-slate-500 mt-0.5">{task.steps.length} 个步骤 · 创建于 {new Date(task.createdAt).toLocaleDateString('zh-CN')}</div>
                     {task.description && <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">{task.description}</p>}
                   </div>
-                  <div className="flex flex-wrap justify-end items-center gap-2 shrink-0 max-w-md">
+                  <div className="flex flex-wrap items-center gap-2 shrink-0 lg:justify-end lg:max-w-md">
                     <div className="text-right mr-2"><div className="text-[14px] font-semibold font-mono text-cyan-glow">{task.sessionCount}</div><div className="text-[9px] text-slate-500">正式会话</div></div>
                     {task.targetStatus === 'ready' && task.targetType !== 'builtin' && <button onClick={() => window.open(targetUrl(task), '_blank', 'noopener,noreferrer')} className="task-action">预览</button>}
                     {task.targetStatus === 'ready' && <button onClick={() => startTrial(task)} disabled={saving} className="task-action disabled:opacity-40">试跑</button>}
@@ -187,7 +187,7 @@ export default function TaskManagePage() {
                 {validatingId === task.id && task.targetType === 'url' && <UrlValidator task={task} snippet={sdkSnippet(task)} onValidated={(updated) => { replaceTask(updated); setValidatingId('') }} onCopy={() => copyText(`sdk-${task.id}`, sdkSnippet(task))} copied={copiedId === `sdk-${task.id}`} />}
                 {editingId === task.id && editTask && <EditForm task={task} value={editTask} setValue={setEditTask} saving={saving} onSave={saveEdit} onCancel={() => { setEditingId(''); setEditTask(null) }} />}
 
-                {task.status === 'active' && <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-ink-900/60 border border-cyan-glow/10"><span className="text-[10px] text-slate-500 shrink-0">测试链接：</span><code className="text-[11px] font-mono text-cyan-soft truncate flex-1">{taskLink(task)}</code><button onClick={() => copyText(task.id, taskLink(task))} className="px-2 py-1 text-[10px] font-mono text-slate-400">{copiedId === task.id ? '已复制' : '复制'}</button></div>}
+                {task.status === 'active' && <div className="mt-4 flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200"><span className="text-[10px] text-slate-500 shrink-0">测试链接</span><code className="text-[11px] font-mono text-indigo-600 truncate flex-1">{taskLink(task)}</code><button onClick={() => copyText(task.id, taskLink(task))} className="px-2 py-1 rounded-md text-[10px] font-medium text-indigo-600 hover:bg-indigo-50">{copiedId === task.id ? '已复制' : '复制'}</button></div>}
               </div>
             ))}
           </div>

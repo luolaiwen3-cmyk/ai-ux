@@ -24,6 +24,7 @@ body {
   font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  margin: 0;
 }
 
 /* 自定义滚动条 */
@@ -171,7 +172,9 @@ body {
 
 /* 分析工作台：浅色底、深色正文。参与者页面不受影响。 */
 .analyst-theme {
-  background: #ffffff;
+  --analyst-accent: #5b5ce2;
+  --analyst-accent-soft: #eef0ff;
+  background: #f6f7fb;
   color: #111827;
   color-scheme: light;
 }
@@ -179,21 +182,24 @@ body {
 .analyst-theme .glass,
 .analyst-theme .glass-strong {
   background: #ffffff;
-  border-color: #e2e8f0;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  border-color: #e7e9f2;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03), 0 10px 32px rgba(15, 23, 42, 0.035);
   backdrop-filter: none;
 }
 
 .analyst-theme [class*='bg-ink-'] {
-  background-color: #f8fafc !important;
+  background-color: #f8f9fc !important;
 }
 
 .analyst-theme [class*='text-slate-100'],
 .analyst-theme [class*='text-slate-200'],
-.analyst-theme [class*='text-slate-300'],
+.analyst-theme [class*='text-slate-300'] {
+  color: #111827 !important;
+}
+
 .analyst-theme [class*='text-cyan-glow'],
 .analyst-theme [class*='text-cyan-soft'] {
-  color: #111827 !important;
+  color: var(--analyst-accent) !important;
 }
 
 .analyst-theme [class*='text-slate-400'] {
@@ -207,7 +213,29 @@ body {
 
 .analyst-theme [class*='border-cyan-glow'],
 .analyst-theme [class*='border-cyan-soft'] {
-  border-color: #d1d5db !important;
+  border-color: #dfe1fb !important;
+}
+
+.analyst-theme [class*='bg-cyan-glow'],
+.analyst-theme [class*='bg-cyan-soft'] {
+  background-color: var(--analyst-accent-soft) !important;
+}
+
+.analyst-theme [class*='border-slate-700'] {
+  border-color: #e5e7eb !important;
+}
+
+.analyst-theme .task-action {
+  border-color: #e2e5ec;
+  background: #ffffff;
+  color: #4b5563;
+  font-size: 11px;
+}
+
+.analyst-theme .task-action:hover {
+  border-color: #c9cdf8;
+  background: #f7f7ff;
+  color: #4f46e5;
 }
 
 .analyst-theme input,
@@ -234,7 +262,7 @@ body {
 
 @layer components {
   .primary-button {
-    @apply flex-1 w-full py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold text-sm transition-colors;
+    @apply flex-1 w-full py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold text-sm transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.99];
   }
 
   .secondary-button {
@@ -255,6 +283,45 @@ body {
 
   .report-badge {
     @apply px-2 py-0.5 rounded text-[10px] font-mono bg-slate-100 text-slate-600 border border-slate-200;
+  }
+
+  .analyst-page {
+    @apply w-full max-w-[1440px] mx-auto px-4 py-5 sm:px-6 sm:py-7 lg:px-8;
+  }
+
+  .analyst-eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-[0.16em] text-indigo-500;
+  }
+
+  .analyst-title {
+    @apply text-2xl font-semibold tracking-tight text-slate-950;
+  }
+
+  .analyst-subtitle {
+    @apply mt-1 text-sm text-slate-500;
+  }
+
+  .analyst-segmented {
+    @apply inline-flex items-center rounded-xl border border-slate-200 bg-white p-1 shadow-sm;
+  }
+
+  .analyst-segment {
+    @apply rounded-lg px-3 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:text-slate-900;
+  }
+
+  .analyst-segment-active {
+    @apply bg-slate-950 text-white shadow-sm hover:text-white;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 
