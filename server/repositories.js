@@ -305,36 +305,126 @@ export function createRepositories(database) {
   }
 
   const diagnoses = {
-    findBySessionId(sessionId) {
-      const row = database.prepare('SELECT * FROM diagnoses WHERE session_id = ?').get(sessionId)
+    mapRow(row) {
       return row && {
         id: row.id,
+        sessionId: row.session_id,
         status: row.status,
         provider: row.provider,
         model: row.model,
         result: parseJson(row.result_json, null),
         fallbackReason: row.fallback_reason,
-        shareToken: row.share_token,
+        shareToken: row.status === 'completed' ? row.share_token : null,
+        attemptCount: Number(row.attempt_count || 0),
+        maxAttempts: Number(row.max_attempts || 0),
+        lastError: row.last_error,
+        queuedAt: row.queued_at,
+        startedAt: row.started_at,
+        completedAt: row.completed_at,
+        nextAttemptAt: row.next_attempt_at,
         createdAt: row.created_at,
         updatedAt: row.updated_at
       }
     },
 
-    save({ id, sessionId, provider, model, result, fallbackReason, shareToken, timestamp }) {
+    findBySessionId(sessionId) {
+      const row = database.prepare('SELECT * FROM diagnoses WHERE session_id = ?').get(sessionId)
+      return diagnoses.mapRow(row)
+    },
+
+    enqueue({ id, sessionId, shareToken, maxAttempts, timestamp }) {
       database.prepare(`
         INSERT INTO diagnoses (
-          id, session_id, status, provider, model, result_json, fallback_reason,
-          share_token, created_at, updated_at
-        ) VALUES (?, ?, 'completed', ?, ?, ?, ?, ?, ?, ?)
+          id, session_id, status, share_token, attempt_count, max_attempts,
+          queued_at, created_at, updated_at
+        ) VALUES (?, ?, 'pending', ?, 0, ?, ?, ?, ?)
         ON CONFLICT(session_id) DO UPDATE SET
-          status = 'completed', provider = excluded.provider, model = excluded.model,
-          result_json = excluded.result_json, fallback_reason = excluded.fallback_reason,
+          status = 'pending', provider = NULL, model = NULL, result_json = NULL,
+          fallback_reason = NULL, attempt_count = 0,
+          max_attempts = excluded.max_attempts, last_error = NULL,
+          queued_at = excluded.queued_at, started_at = NULL, completed_at = NULL,
+          next_attempt_at = NULL, claimed_at = NULL,
           updated_at = excluded.updated_at
       `).run(
-        id, sessionId, provider, model, JSON.stringify(result), fallbackReason,
-        shareToken, timestamp, timestamp
+        id, sessionId, shareToken, maxAttempts, timestamp, timestamp, timestamp
       )
       return diagnoses.findBySessionId(sessionId)
+    },
+
+    releaseClaims() {
+      return database.prepare(`
+        UPDATE diagnoses SET claimed_at = NULL
+        WHERE status = 'pending' AND claimed_at IS NOT NULL
+      `).run().changes
+    },
+
+    claimNext(timestamp) {
+      return database.transaction(() => {
+        const row = database.prepare(`
+          SELECT * FROM diagnoses
+          WHERE status = 'pending'
+            AND claimed_at IS NULL
+            AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
+          ORDER BY queued_at, created_at
+          LIMIT 1
+        `).get(timestamp)
+        if (!row) return null
+        const claimed = database.prepare(`
+          UPDATE diagnoses
+          SET claimed_at = ?, started_at = COALESCE(started_at, ?),
+            attempt_count = attempt_count + 1, updated_at = ?
+          WHERE id = ? AND status = 'pending' AND claimed_at IS NULL
+        `).run(timestamp, timestamp, timestamp, row.id)
+        if (claimed.changes !== 1) return null
+        return diagnoses.mapRow(
+          database.prepare('SELECT * FROM diagnoses WHERE id = ?').get(row.id)
+        )
+      })()
+    },
+
+    complete(sessionId, { provider, model, result, fallbackReason, timestamp }) {
+      database.prepare(`
+        UPDATE diagnoses
+        SET status = 'completed', provider = ?, model = ?, result_json = ?,
+          fallback_reason = ?, last_error = NULL, completed_at = ?,
+          next_attempt_at = NULL, claimed_at = NULL, updated_at = ?
+        WHERE session_id = ? AND status = 'pending'
+      `).run(
+        provider, model, JSON.stringify(result), fallbackReason,
+        timestamp, timestamp, sessionId
+      )
+      return diagnoses.findBySessionId(sessionId)
+    },
+
+    failAttempt(sessionId, { error, nextAttemptAt, timestamp }) {
+      return database.transaction(() => {
+        const row = database.prepare(`
+          SELECT attempt_count, max_attempts FROM diagnoses
+          WHERE session_id = ? AND status = 'pending'
+        `).get(sessionId)
+        if (!row) return diagnoses.findBySessionId(sessionId)
+        const exhausted = row.attempt_count >= row.max_attempts
+        database.prepare(`
+          UPDATE diagnoses
+          SET status = ?, last_error = ?, completed_at = ?, next_attempt_at = ?,
+            claimed_at = NULL, updated_at = ?
+          WHERE session_id = ? AND status = 'pending'
+        `).run(
+          exhausted ? 'failed' : 'pending', error,
+          exhausted ? timestamp : null,
+          exhausted ? null : nextAttemptAt,
+          timestamp, sessionId
+        )
+        return diagnoses.findBySessionId(sessionId)
+      })()
+    },
+
+    findNextAttemptAt() {
+      const row = database.prepare(`
+        SELECT MIN(COALESCE(next_attempt_at, queued_at)) AS next_at
+        FROM diagnoses WHERE status = 'pending' AND claimed_at IS NULL
+      `).get()
+      return row?.next_at || null
     },
 
     findSessionIdByShareToken(token) {

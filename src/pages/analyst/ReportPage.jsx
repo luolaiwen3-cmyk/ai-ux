@@ -39,7 +39,7 @@ export default function ReportPage() {
       <ReportDocument
         session={session}
         error={error}
-        actions={session?.diagnosis ? <><button onClick={copyShareLink} className="report-action">{copied ? '✓ 链接已复制' : '🔗 分享链接'}</button><button onClick={() => window.print()} className="report-primary-action">📄 打印 / 导出 PDF</button></> : null}
+        actions={session?.diagnosis?.status === 'completed' ? <><button onClick={copyShareLink} className="report-action">{copied ? '✓ 链接已复制' : '🔗 分享链接'}</button><button onClick={() => window.print()} className="report-primary-action">📄 打印 / 导出 PDF</button></> : null}
       />
     </AnalystLayout>
   )
@@ -61,7 +61,7 @@ export function ReportDocument({ session, error, actions, publicView = false }) 
       </div>
 
       {error && <div className="max-w-2xl mx-auto rounded-xl border border-red-200 bg-red-50 text-red-700 p-4 text-sm">{error}</div>}
-      {!error && session && !report && <div className="max-w-2xl mx-auto rounded-xl border border-amber-200 bg-amber-50 p-8 text-center"><div className="text-sm font-medium text-amber-800">该会话尚未生成诊断</div><p className="text-xs text-amber-700 mt-2">请返回深度分析页运行智能诊断。</p></div>}
+      {!error && session && !report && <div className="max-w-2xl mx-auto rounded-xl border border-amber-200 bg-amber-50 p-8 text-center"><div className="text-sm font-medium text-amber-800">{diagnosis?.status === 'pending' ? '诊断正在后台生成' : diagnosis?.status === 'failed' ? '诊断生成失败' : '该会话尚未生成诊断'}</div><p className="text-xs text-amber-700 mt-2">{diagnosis?.status === 'pending' ? '请稍后刷新，完成后即可导出和分享。' : diagnosis?.status === 'failed' ? '请返回深度分析页查看失败原因并重试。' : '请返回深度分析页运行智能诊断。'}</p></div>}
 
       {report && (
         <div className="report-print-area max-w-2xl mx-auto bg-white rounded-xl border border-slate-200 shadow-sm p-8 text-slate-900">

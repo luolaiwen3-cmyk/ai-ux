@@ -57,7 +57,9 @@ test('参与者服务完成会话并隔离试跑诊断', async () => {
     })
     assert.equal(completed.status, 'completed')
     assert.equal(completed.events.length, 2)
-    assert.equal((await services.analysis.diagnose(created.id)).provider, 'local-rules')
+    const queued = services.analysis.enqueueDiagnosis(created.id)
+    assert.equal(queued.status, 'pending')
+    assert.equal(queued.attemptCount, 0)
 
     const trial = services.sessions.createTrial(task.id)
     services.sessions.start(trial.id, trial.uploadToken)
@@ -65,7 +67,7 @@ test('参与者服务完成会话并隔离试跑诊断', async () => {
       couponDecision: 'none', events: [], faceFrames: [], metrics: {}, result: {}
     })
     await assert.rejects(
-      services.analysis.diagnose(trial.id),
+      Promise.resolve().then(() => services.analysis.enqueueDiagnosis(trial.id)),
       (error) => error.code === 'TRIAL_DIAGNOSIS_DISABLED'
     )
   } finally {

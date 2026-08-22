@@ -105,7 +105,8 @@ export const api = {
       return requestEnvelope(`/api/v1/sessions?${query}`)
     },
     get: (id) => request(`/api/v1/sessions/${encodeURIComponent(id)}`),
-    diagnose: (id) => request(`/api/v1/sessions/${encodeURIComponent(id)}/diagnosis`, { method: 'POST' })
+    diagnose: (id) => request(`/api/v1/sessions/${encodeURIComponent(id)}/diagnosis`, { method: 'POST' }),
+    getDiagnosis: (id) => request(`/api/v1/sessions/${encodeURIComponent(id)}/diagnosis`)
   },
 
   dashboard: {

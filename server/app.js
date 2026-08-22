@@ -6,6 +6,8 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ADMIN_COOKIE_NAME, verifyPassword } from './auth.js'
 import { openDatabase } from './database.js'
+import { diagnoseSession } from './diagnosis.js'
+import { createDiagnosisWorker } from './diagnosisWorker.js'
 import { AppError, unauthorized } from './errors.js'
 import { createRepositories } from './repositories.js'
 import { authRoutes } from './routes/auth.js'
@@ -45,7 +47,8 @@ export function createApp({
   database: suppliedDatabase,
   logger,
   apiOnly = false,
-  assetsDir
+  assetsDir,
+  diagnose = diagnoseSession
 } = {}) {
   if (!config) throw new Error('createApp 必须提供 config')
 
@@ -57,11 +60,18 @@ export function createApp({
   const repositories = createRepositories(database)
   const services = createServices({ repositories, config })
   const siteStorage = createSiteStorage(config.siteDir || './data/task-sites')
+  const diagnosisWorker = createDiagnosisWorker({
+    diagnoses: repositories.diagnoses,
+    execute: async (job) => diagnose(services.sessions.get(job.sessionId), config),
+    logger: app.log,
+    retryDelayMs: config.diagnosisRetryDelayMs || 2000
+  })
 
   app.decorate('config', config)
   app.decorate('repositories', repositories)
   app.decorate('services', services)
   app.decorate('siteStorage', siteStorage)
+  app.decorate('diagnosisWorker', diagnosisWorker)
   app.decorate('verifyAdminPassword', (password) => verifyPassword(password, config.adminPassword))
   app.decorate('createAdminSession', createAdminSession)
 
@@ -171,8 +181,10 @@ export function createApp({
 
   app.addHook('onReady', async () => {
     if (config.seedDemo) services.tasks.seedDemo()
+    diagnosisWorker.start()
   })
   app.addHook('onClose', async () => {
+    await diagnosisWorker.stop()
     database.close()
   })
 

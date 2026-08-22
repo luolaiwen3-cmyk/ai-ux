@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/apiClient.js'
 
@@ -9,13 +9,42 @@ const providerLabels = {
 
 export default function DiagnosisPanel({ sessionId, initialDiagnosis = null, onDiagnosed }) {
   const [diagnosis, setDiagnosis] = useState(initialDiagnosis)
-  const [diagnosing, setDiagnosing] = useState(false)
+  const [starting, setStarting] = useState(false)
   const [error, setError] = useState('')
+  const onDiagnosedRef = useRef(onDiagnosed)
 
   useEffect(() => setDiagnosis(initialDiagnosis), [initialDiagnosis])
+  useEffect(() => { onDiagnosedRef.current = onDiagnosed }, [onDiagnosed])
+
+  useEffect(() => {
+    if (diagnosis?.status !== 'pending') return undefined
+    let active = true
+    let timer = null
+
+    const poll = async () => {
+      try {
+        const result = await api.sessions.getDiagnosis(sessionId)
+        if (!active) return
+        setDiagnosis(result)
+        setError('')
+        onDiagnosedRef.current?.(result)
+        if (result.status === 'pending') timer = window.setTimeout(poll, 1200)
+      } catch (requestError) {
+        if (!active) return
+        setError(`${requestError.message}，正在重试状态查询`)
+        timer = window.setTimeout(poll, 2000)
+      }
+    }
+
+    timer = window.setTimeout(poll, 500)
+    return () => {
+      active = false
+      if (timer) window.clearTimeout(timer)
+    }
+  }, [diagnosis?.status, sessionId])
 
   const handleDiagnose = async () => {
-    setDiagnosing(true)
+    setStarting(true)
     setError('')
     try {
       const result = await api.sessions.diagnose(sessionId)
@@ -24,10 +53,11 @@ export default function DiagnosisPanel({ sessionId, initialDiagnosis = null, onD
     } catch (requestError) {
       setError(requestError.message)
     } finally {
-      setDiagnosing(false)
+      setStarting(false)
     }
   }
 
+  const diagnosing = starting || diagnosis?.status === 'pending'
   const report = diagnosis?.result
 
   return (
@@ -35,19 +65,21 @@ export default function DiagnosisPanel({ sessionId, initialDiagnosis = null, onD
       <div className="flex items-center justify-between gap-3">
         <div>
           <span className="text-[12px] font-mono text-slate-400 tracking-wide">AGENT · 智能诊断</span>
-          {diagnosis && <div className="text-[9px] text-slate-500 mt-0.5">{providerLabels[diagnosis.provider] || diagnosis.provider} · {diagnosis.model}</div>}
+          {diagnosis?.provider && <div className="text-[9px] text-slate-500 mt-0.5">{providerLabels[diagnosis.provider] || diagnosis.provider} · {diagnosis.model}</div>}
         </div>
         <button onClick={handleDiagnose} disabled={diagnosing} className="px-3 py-1.5 rounded-lg font-medium text-[11px] flex items-center gap-2 bg-gradient-to-r from-cyan-glow/90 to-cyan-soft/90 text-ink-900 disabled:opacity-50">
           {diagnosing && <span className="w-3 h-3 rounded-full border-2 border-ink-900/30 border-t-ink-900 animate-spin" />}
-          {diagnosing ? '分析中…' : diagnosis ? '重新诊断' : '开始智能诊断'}
+          {diagnosing ? '后台分析中…' : diagnosis?.status === 'failed' ? '重试诊断' : diagnosis ? '重新诊断' : '开始智能诊断'}
         </button>
       </div>
 
       {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</div>}
 
-      {!diagnosing && !report && !error && <div className="text-center py-6 text-[11px] text-slate-500">系统将基于当前会话的行为、面部和任务结果生成诊断</div>}
+      {!diagnosing && !report && !error && diagnosis?.status !== 'failed' && <div className="text-center py-6 text-[11px] text-slate-500">系统将基于当前会话的行为、面部和任务结果生成诊断</div>}
 
-      {diagnosing && <div className="space-y-2 py-2"><div className="h-3 rounded shimmer w-3/4" /><div className="h-3 rounded shimmer" /><div className="h-16 rounded shimmer" /></div>}
+      {diagnosing && <div className="space-y-2 py-2"><div className="text-[10px] text-slate-500">任务已进入后台队列 · 已尝试 {diagnosis?.attemptCount || 0}/{diagnosis?.maxAttempts || '—'} 次</div><div className="h-3 rounded shimmer w-3/4" /><div className="h-3 rounded shimmer" /><div className="h-16 rounded shimmer" /></div>}
+
+      {diagnosis?.status === 'failed' && !starting && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-3 text-xs text-red-700"><div className="font-medium">诊断在 {diagnosis.attemptCount} 次尝试后失败</div><p className="mt-1 text-[10px] leading-relaxed">{diagnosis.lastError || '后台诊断发生未知错误，可以手动重试。'}</p></div>}
 
       {report && !diagnosing && (
         <div className="space-y-3 animate-[fadeIn_.3s_ease-out]">

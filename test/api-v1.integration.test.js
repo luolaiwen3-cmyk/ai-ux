@@ -18,11 +18,16 @@ const config = {
   seedDemo: false
 }
 
-const buildApp = () => createApp({
-  config: { ...config, siteDir: mkdtempSync(path.join(os.tmpdir(), 'insightux-v1-sites-')) },
+const buildApp = ({ diagnose, configOverrides = {} } = {}) => createApp({
+  config: {
+    ...config,
+    ...configOverrides,
+    siteDir: mkdtempSync(path.join(os.tmpdir(), 'insightux-v1-sites-'))
+  },
   database: openDatabase(':memory:'),
   logger: false,
-  apiOnly: true
+  apiOnly: true,
+  diagnose
 })
 
 const createZip = (files) => new Promise((resolve, reject) => {
@@ -40,6 +45,18 @@ const login = async (app) => {
     method: 'POST', url: '/api/v1/auth/login', payload: { password: 'test-password' }
   })
   return response.headers['set-cookie'].split(';')[0]
+}
+
+const waitForDiagnosis = async (app, sessionId, cookie) => {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const response = await app.inject({
+      method: 'GET', url: `/api/v1/sessions/${sessionId}/diagnosis`, headers: { cookie }
+    })
+    const diagnosis = response.json().data
+    if (diagnosis.status !== 'pending') return diagnosis
+    await new Promise((resolve) => setTimeout(resolve, 10))
+  }
+  assert.fail('诊断任务未在预期时间内结束')
 }
 
 test('v1 API 完成任务、参与者、诊断和分享报告主链路', async () => {
@@ -101,8 +118,10 @@ test('v1 API 完成任务、参与者、诊断和分享报告主链路', async (
       url: `/api/v1/sessions/${session.id}/diagnosis`,
       headers: { cookie }
     })
-    assert.equal(diagnosisResponse.statusCode, 200)
-    const diagnosis = diagnosisResponse.json().data
+    assert.equal(diagnosisResponse.statusCode, 202)
+    assert.equal(diagnosisResponse.json().data.status, 'pending')
+    const diagnosis = await waitForDiagnosis(app, session.id, cookie)
+    assert.equal(diagnosis.status, 'completed')
     assert.equal(diagnosis.provider, 'local-rules')
 
     const report = await app.inject({
@@ -130,6 +149,44 @@ test('v1 API 通过 Schema、Cookie 和 Bearer Token 拒绝非法请求', async 
     assert.equal(invalid.statusCode, 400)
     assert.equal(invalid.json().error.code, 'VALIDATION_ERROR')
     assert.ok(invalid.json().error.details.length > 0)
+  } finally {
+    await app.close()
+  }
+})
+
+test('v1 API 暴露诊断失败状态并允许重新入队', async () => {
+  const app = buildApp({
+    diagnose: async () => { throw new Error('诊断执行器异常') },
+    configOverrides: { diagnosisMaxAttempts: 2, diagnosisRetryDelayMs: 1 }
+  })
+  try {
+    const cookie = await login(app)
+    const task = app.services.tasks.create({
+      name: '失败诊断任务', steps: ['完成'], targetType: 'builtin', status: 'active'
+    })
+    const session = app.services.sessions.createParticipant(task.token, true)
+    app.services.sessions.start(session.id, session.uploadToken)
+    app.services.sessions.complete(session.id, session.uploadToken, {
+      couponDecision: 'none', events: [], faceFrames: [], metrics: {}, result: {}
+    })
+
+    const queued = await app.inject({
+      method: 'POST', url: `/api/v1/sessions/${session.id}/diagnosis`, headers: { cookie }
+    })
+    assert.equal(queued.statusCode, 202)
+    assert.equal(queued.json().data.status, 'pending')
+
+    const failed = await waitForDiagnosis(app, session.id, cookie)
+    assert.equal(failed.status, 'failed')
+    assert.equal(failed.attemptCount, 2)
+    assert.match(failed.lastError, /诊断执行器异常/)
+
+    const retried = await app.inject({
+      method: 'POST', url: `/api/v1/sessions/${session.id}/diagnosis`, headers: { cookie }
+    })
+    assert.equal(retried.statusCode, 202)
+    assert.equal(retried.json().data.status, 'pending')
+    assert.equal(retried.json().data.attemptCount, 0)
   } finally {
     await app.close()
   }

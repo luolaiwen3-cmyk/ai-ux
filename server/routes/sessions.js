@@ -30,10 +30,20 @@ export function sessionRoutes(app, _options, done) {
 
   app.post('/sessions/:sessionId/diagnosis', {
     schema: {
+      tags: ['sessions'], params: idParams('sessionId'), response: { 202: objectDataResponse }
+    }
+  }, async (request, reply) => {
+    const diagnosis = app.services.analysis.enqueueDiagnosis(request.params.sessionId)
+    app.diagnosisWorker.wake()
+    return reply.code(202).send({ data: diagnosis })
+  })
+
+  app.get('/sessions/:sessionId/diagnosis', {
+    schema: {
       tags: ['sessions'], params: idParams('sessionId'), response: { 200: objectDataResponse }
     }
   }, async (request) => ({
-    data: await app.services.analysis.diagnose(request.params.sessionId)
+    data: app.services.analysis.getDiagnosis(request.params.sessionId)
   }))
 
   app.get('/dashboard', {

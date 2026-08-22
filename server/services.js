@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto'
 import { createOpaqueToken, hashToken } from './auth.js'
-import { diagnoseSession } from './diagnosis.js'
 import { AppError, conflict, notFound, unauthorized } from './errors.js'
 import { analyzeSession } from './metrics.js'
 
@@ -335,7 +334,7 @@ export function createServices({ repositories, config }) {
   }
 
   const analysisService = {
-    async diagnose(sessionId) {
+    enqueueDiagnosis(sessionId) {
       const session = sessionService.get(sessionId)
       if (session.status !== 'completed') {
         throw conflict('SESSION_NOT_COMPLETED', '会话完成后才能诊断')
@@ -343,18 +342,22 @@ export function createServices({ repositories, config }) {
       if (session.mode === 'trial') {
         throw conflict('TRIAL_DIAGNOSIS_DISABLED', '试跑会话不生成诊断或报告')
       }
-      const diagnosis = await diagnoseSession(session, config)
       const current = repositories.diagnoses.findBySessionId(sessionId)
-      return repositories.diagnoses.save({
+      if (current?.status === 'pending') return current
+      return repositories.diagnoses.enqueue({
         id: current?.id || randomUUID(),
         sessionId,
-        provider: diagnosis.provider,
-        model: diagnosis.model,
-        result: diagnosis.result,
-        fallbackReason: diagnosis.fallbackReason,
         shareToken: current?.shareToken || createOpaqueToken(18),
+        maxAttempts: config.diagnosisMaxAttempts || 3,
         timestamp: nowIso()
       })
+    },
+
+    getDiagnosis(sessionId) {
+      sessionService.get(sessionId)
+      const diagnosis = repositories.diagnoses.findBySessionId(sessionId)
+      if (!diagnosis) throw notFound('DIAGNOSIS_NOT_FOUND', '该会话尚未创建诊断任务')
+      return diagnosis
     },
 
     getSharedReport(token) {

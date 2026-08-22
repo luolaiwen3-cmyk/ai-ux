@@ -68,6 +68,8 @@ QWEN_MODEL=qwen3-vl-plus
 
 密钥只由 Node 服务读取，不会进入浏览器构建产物。不同百炼地域的 API Key 与 Base URL 必须配套；模型不可用或 45 秒超时时，系统保存规则降级原因并继续生成报告。
 
+诊断请求会先持久化为后台任务并立即返回，页面自动轮询任务状态。进程重启后会继续未完成任务；流水线异常按照 `DIAGNOSIS_MAX_ATTEMPTS` 和 `DIAGNOSIS_RETRY_DELAY_MS` 自动重试，耗尽后保存失败原因并允许手动重试。状态机、接口和运维边界见 [异步诊断任务说明](docs/ASYNC_DIAGNOSIS.md)。
+
 ## 创建网页测试
 
 在 `/#/tasks` 新建任务时可以选择三种测试网页：

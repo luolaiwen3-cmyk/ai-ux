@@ -8,6 +8,7 @@ try {
 }
 
 const isProduction = process.env.NODE_ENV === 'production'
+const integerEnv = (name, fallback) => Number(process.env[name] || fallback)
 
 export const config = {
   host: process.env.HOST || '0.0.0.0',
@@ -20,6 +21,8 @@ export const config = {
   dashscopeApiKey: process.env.DASHSCOPE_API_KEY || '',
   qwenBaseUrl: process.env.QWEN_BASE_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1',
   qwenModel: process.env.QWEN_MODEL || 'qwen3-vl-plus',
+  diagnosisMaxAttempts: integerEnv('DIAGNOSIS_MAX_ATTEMPTS', 3),
+  diagnosisRetryDelayMs: integerEnv('DIAGNOSIS_RETRY_DELAY_MS', 2000),
   seedDemo: process.env.INSIGHTUX_SEED_DEMO
     ? process.env.INSIGHTUX_SEED_DEMO === 'true'
     : !isProduction,
@@ -29,6 +32,12 @@ export const config = {
 export function validateConfig() {
   if (!Number.isInteger(config.port) || config.port < 1 || config.port > 65535) {
     throw new Error('PORT 必须是 1-65535 之间的整数')
+  }
+  if (!Number.isInteger(config.diagnosisMaxAttempts) || config.diagnosisMaxAttempts < 1 || config.diagnosisMaxAttempts > 10) {
+    throw new Error('DIAGNOSIS_MAX_ATTEMPTS 必须是 1-10 之间的整数')
+  }
+  if (!Number.isInteger(config.diagnosisRetryDelayMs) || config.diagnosisRetryDelayMs < 100 || config.diagnosisRetryDelayMs > 60000) {
+    throw new Error('DIAGNOSIS_RETRY_DELAY_MS 必须是 100-60000 之间的整数')
   }
 
   if (isProduction) {
